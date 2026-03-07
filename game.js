@@ -131,8 +131,9 @@ class PvZMatchGame {
         for (const pos of basePositions) {
             for (let l = 0; l < pos.layers && cardIndex < cards.length; l++) {
                 cards[cardIndex].layer = l;
-                cards[cardIndex].x = pos.x + (l * 3); // 每层偏移 3px
-                cards[cardIndex].y = pos.y - (l * 3); // 向上偏移
+                // 使用整数坐标，每层偏移 5px（更明显）
+                cards[cardIndex].x = Math.round(pos.x + (l * 5));
+                cards[cardIndex].y = Math.round(pos.y - (l * 5));
                 cardIndex++;
             }
         }
@@ -142,8 +143,8 @@ class PvZMatchGame {
             const randomPos = basePositions[Math.floor(Math.random() * basePositions.length)];
             const newLayer = randomPos.layers;
             cards[cardIndex].layer = newLayer;
-            cards[cardIndex].x = randomPos.x + (newLayer * 3);
-            cards[cardIndex].y = randomPos.y - (newLayer * 3);
+            cards[cardIndex].x = Math.round(randomPos.x + (newLayer * 5));
+            cards[cardIndex].y = Math.round(randomPos.y - (newLayer * 5));
             randomPos.layers++;
             cardIndex++;
         }
@@ -168,9 +169,47 @@ class PvZMatchGame {
             positionGroups[key] = (positionGroups[key] || 0) + 1;
         }
         const stackHeights = Object.values(positionGroups);
-        console.log(`📊 堆叠统计：${Object.keys(positionGroups).length} 堆，最大高度 ${Math.max(...stackHeights)}, 最小高度 ${Math.min(...stackHeights)}`);
+        const maxStack = Math.max(...stackHeights);
+        const minStack = Math.min(...stackHeights);
+        const avgStack = (stackHeights.reduce((a, b) => a + b, 0) / stackHeights.length).toFixed(1);
+        
+        console.log(`📊 堆叠统计：${Object.keys(positionGroups).length} 堆，最大高度 ${maxStack}, 最小高度 ${minStack}, 平均 ${avgStack}`);
+        
+        // 在界面上显示调试信息
+        this.showDebugInfo(Object.keys(positionGroups).length, maxStack, minStack, avgStack);
         
         return cards;
+    }
+    
+    showDebugInfo(stackCount, maxStack, minStack, avgStack) {
+        // 移除旧的调试信息
+        const oldDebug = document.getElementById('stackDebug');
+        if (oldDebug) oldDebug.remove();
+        
+        // 创建新的调试信息
+        const debugDiv = document.createElement('div');
+        debugDiv.id = 'stackDebug';
+        debugDiv.style.cssText = `
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            color: #0f0;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 9999;
+            font-family: monospace;
+            border: 1px solid #0f0;
+        `;
+        debugDiv.innerHTML = `
+            <div>📊 堆叠统计</div>
+            <div>堆数：${stackCount}</div>
+            <div>最大高度：${maxStack}</div>
+            <div>最小高度：${minStack}</div>
+            <div>平均高度：${avgStack}</div>
+        `;
+        document.body.appendChild(debugDiv);
     }
     
     generateBasePositions(totalCards, maxLayers, boardWidth, boardHeight, cardWidth, cardHeight) {
