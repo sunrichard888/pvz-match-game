@@ -86,14 +86,13 @@ class PvZMatchGame {
             remainingCards -= 3;
         }
         
-        // 创建所有牌
+        // 创建所有牌（先不分配 emoji，只创建空牌）
         let cardId = 0;
         for (let i = 0; i < config.cardTypes; i++) {
-            const emoji = this.pvzEmojis.plants[i % this.pvzEmojis.plants.length];
             for (let j = 0; j < cardsPerType[i]; j++) {
                 cards.push({
                     id: cardId++,
-                    emoji: emoji,
+                    emoji: '',  // 暂时为空，后面随机分配
                     faceUp: true,
                     removed: false,
                     layer: 0,
@@ -115,11 +114,11 @@ class PvZMatchGame {
         const cardWidth = 60;
         const cardHeight = 60;
         
+        // 第一步：先分配位置（不考虑图案）
         // 创建层结构（不规则分布）
         const layers = [];
         for (let l = 0; l < config.layers; l++) {
-            // 每层牌数递减，但不平均
-            const layerRatio = 1 - (l / config.layers) * 0.6; // 顶层 40%，底层 100%
+            const layerRatio = 1 - (l / config.layers) * 0.6;
             const cardsInLayer = Math.floor(cards.length / config.layers * layerRatio);
             layers.push({
                 layer: l,
@@ -138,7 +137,7 @@ class PvZMatchGame {
             }
         }
         
-        // 剩余牌分配到随机层
+        // 剩余牌随机分配到各层
         while (cardIndex < cards.length) {
             const randomLayer = layers[Math.floor(Math.random() * layers.length)];
             cards[cardIndex].layer = randomLayer.layer;
@@ -146,7 +145,7 @@ class PvZMatchGame {
             cardIndex++;
         }
         
-        // 为每层生成位置（不重叠但可部分遮挡）
+        // 为每层生成位置
         for (const layer of layers) {
             const positions = this.generateLayerPositions(
                 layer.cards.length,
@@ -164,7 +163,10 @@ class PvZMatchGame {
             }
         }
         
-        // 设置反面牌（随机 25%）
+        // 第二步：随机分配图案（关键：让同种图案分散）
+        this.assignEmojisRandomly(cards, config);
+        
+        // 第三步：设置反面牌
         for (const card of cards) {
             if (Math.random() < this.faceDownRatio) {
                 card.faceUp = false;
@@ -175,6 +177,46 @@ class PvZMatchGame {
         cards.sort((a, b) => a.layer - b.layer);
         
         return cards;
+    }
+    
+    assignEmojisRandomly(cards, config) {
+        // 创建 emoji 池（确保每种图案数量是 3 的倍数）
+        const emojiPool = [];
+        const cardsPerType = [];
+        let remainingCards = cards.length;
+        
+        // 计算每种图案的牌数
+        for (let i = 0; i < config.cardTypes; i++) {
+            const count = Math.min(
+                Math.max(3, Math.floor(Math.random() * 3) * 3 + 3),
+                remainingCards - (config.cardTypes - i - 1) * 3
+            );
+            cardsPerType.push(count);
+            remainingCards -= count;
+        }
+        
+        // 分配剩余牌
+        while (remainingCards > 0) {
+            const idx = Math.floor(Math.random() * config.cardTypes);
+            cardsPerType[idx] += 3;
+            remainingCards -= 3;
+        }
+        
+        // 填充 emoji 池
+        for (let i = 0; i < config.cardTypes; i++) {
+            const emoji = this.pvzEmojis.plants[i % this.pvzEmojis.plants.length];
+            for (let j = 0; j < cardsPerType[i]; j++) {
+                emojiPool.push(emoji);
+            }
+        }
+        
+        // 关键：完全打乱 emoji 池
+        this.shuffleArray(emojiPool);
+        
+        // 分配给所有牌
+        for (let i = 0; i < cards.length; i++) {
+            cards[i].emoji = emojiPool[i];
+        }
     }
     
     generateLayerPositions(count, boardWidth, boardHeight, cardWidth, cardHeight, layer, totalLayers) {
@@ -549,6 +591,7 @@ class PvZMatchGame {
     }
     
     shuffleArray(array) {
+        // Fisher-Yates 洗牌算法
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [array[i], array[j]] = [array[j], array[i]];
