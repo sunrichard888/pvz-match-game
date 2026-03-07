@@ -161,12 +161,12 @@ class PvZMatchGame {
             cards[i].layer = gridPositions[i].layer;
         }
         
-        // 统计堆叠情况
+        // 统计堆叠情况（使用和 assignEmojisRandomly 一样的还原方法）
         const positionMap = {};
         for (const card of cards) {
-            // 基础位置（不考虑层偏移）
-            const baseX = Math.round(card.x / 5) * 5;
-            const baseY = Math.round(card.y / 5) * 5;
+            // 还原基础位置：每层偏移 4px
+            const baseX = card.x - (card.layer * 4);
+            const baseY = card.y + (card.layer * 4);
             const key = `${baseX},${baseY}`;
             positionMap[key] = (positionMap[key] || 0) + 1;
         }
