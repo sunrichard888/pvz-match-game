@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>堆叠测试 - 直接内嵌 JS</title>
+<style>
+body { background: #1a472a; color: white; font-family: monospace; padding: 20px; }
+#output { background: rgba(0,0,0,0.5); padding: 20px; border-radius: 10px; }
+.card { display: inline-block; width: 40px; height: 40px; background: #90EE90; 
+        border: 2px solid #333; border-radius: 5px; text-align: center; line-height: 40px; margin: 2px; }
+</style>
+</head>
+<body>
+<h1>🎮 堆叠算法测试</h1>
+<div id="output"></div>
+<h2>可视化:</h2>
+<div id="visual"></div>
+
+<script>
+// === 直接内嵌游戏逻辑（确保最新）===
+const config = { totalCards: 36, layers: 3 };
+const cards = [];
+for (let i = 0; i < config.totalCards; i++) {
+    cards.push({ id: i, x: 0, y: 0, layer: 0, emoji: '🌻' });
+}
+
+// 堆叠算法
+const gridCols = 8;
+const gridRows = 6;
+const gridPositions = [];
+
+for (let row = 0; row < gridRows; row++) {
+    for (let col = 0; col < gridCols; col++) {
+        const x = 40 + col * 55;
+        const y = 40 + row * 55;
+        const stackHeight = Math.floor(Math.random() * config.layers) + 1;
+        
+        for (let l = 0; l < stackHeight; l++) {
+            gridPositions.push({
+                x: x + (l * 4),
+                y: y - (l * 4),
+                layer: l
+            });
+        }
+    }
+}
+
+while (gridPositions.length < cards.length) {
+    const randomIdx = Math.floor(Math.random() * gridPositions.length);
+    const basePos = gridPositions[randomIdx];
+    const newLayer = basePos.layer + 1;
+    gridPositions.push({
+        x: basePos.x + 4,
+        y: basePos.y - 4,
+        layer: newLayer
+    });
+}
+
+for (let i = 0; i < cards.length; i++) {
+    cards[i].x = gridPositions[i].x;
+    cards[i].y = gridPositions[i].y;
+    cards[i].layer = gridPositions[i].layer;
+}
+
+// 统计
+const positionMap = {};
+for (const card of cards) {
+    const baseX = card.x - (card.layer * 4);
+    const baseY = card.y + (card.layer * 4);
+    const key = `${baseX},${baseY}`;
+    positionMap[key] = (positionMap[key] || 0) + 1;
+}
+
+const stackHeights = Object.values(positionMap);
+const maxStack = Math.max(...stackHeights);
+const minStack = Math.min(...stackHeights);
+
+// 输出
+document.getElementById('output').innerHTML = `
+    <p>总牌数：${cards.length}</p>
+    <p>网格位置数：${gridPositions.length}</p>
+    <p>堆数：${Object.keys(positionMap).length}</p>
+    <p><strong style="color: #0f0;">最大堆高：${maxStack}</strong></p>
+    <p>最小堆高：${minStack}</p>
+    <p>平均堆高：${(stackHeights.reduce((a,b)=>a+b,0)/stackHeights.length).toFixed(1)}</p>
+    <h3>前 20 张牌:</h3>
+    <pre>${cards.slice(0,20).map((c,i) => `[${i}] x=${c.x}, y=${c.y}, layer=${c.layer}`).join('\n')}</pre>
+    <h3>所有堆:</h3>
+    <pre>${Object.entries(positionMap).map(([k,v]) => `${k}: ${v}张`).join('\n')}</pre>
+`;
+
+// 可视化前 48 张牌
+const visual = document.getElementById('visual');
+cards.slice(0, 48).forEach((c, i) => {
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.style.position = 'relative';
+    div.style.left = (c.x % 400) + 'px';
+    div.style.top = Math.floor(c.x / 400) * 50 + 'px';
+    div.textContent = `L${c.layer}`;
+    div.title = `[${i}] x=${c.x}, y=${c.y}, layer=${c.layer}`;
+    visual.appendChild(div);
+});
+</script>
+</body>
+</html>

@@ -813,6 +813,13 @@ class PvZMatchGame {
         this.gameActive = true;
         this.cards = this.createCards();
         this.cards = this.generateStackLayout(this.cards);
+        
+        // 最终验证
+        console.log('✅ startLevel 完成后的坐标:');
+        for (let i = 0; i < Math.min(10, this.cards.length); i++) {
+            console.log(`  [${i}] x=${this.cards[i].x}, y=${this.cards[i].y}, layer=${this.cards[i].layer}`);
+        }
+        
         this.renderBoard();
         this.renderHand();
         this.updateStats();
