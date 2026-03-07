@@ -233,10 +233,14 @@ class PvZMatchGame {
     }
     
     assignEmojisRandomly(cards, config) {
-        // 第一步：按位置分组（同一 x,y 坐标的牌是一堆）
+        // 第一步：按位置分组（关键：使用基础位置，不是精确坐标）
+        // 因为每层偏移 4px，需要还原到基础位置
         const positionGroups = {};
         for (const card of cards) {
-            const key = `${card.x},${card.y}`;
+            // 还原基础位置：每 4px 偏移对应一层
+            const baseX = card.x - (card.layer * 4);
+            const baseY = card.y + (card.layer * 4);
+            const key = `${baseX},${baseY}`;
             if (!positionGroups[key]) {
                 positionGroups[key] = [];
             }
@@ -245,6 +249,8 @@ class PvZMatchGame {
         
         const stacks = Object.values(positionGroups);
         const maxStackHeight = Math.max(...stacks.map(s => s.length));
+        
+        console.log(`🔍 分组统计：${stacks.length} 堆，最大堆高 ${maxStackHeight}`);
         
         // 检查：如果图案种类数 < 最大堆高，无法避免同堆重复
         if (config.cardTypes < maxStackHeight) {
