@@ -161,6 +161,13 @@ class PvZMatchGame {
             cards[i].layer = gridPositions[i].layer;
         }
         
+        // 调试：统计各层数量
+        const layerCount = {};
+        for (const card of cards) {
+            layerCount[card.layer] = (layerCount[card.layer] || 0) + 1;
+        }
+        console.log('🔍 层分布:', layerCount);
+        
         // 统计堆叠情况（使用和 assignEmojisRandomly 一样的还原方法）
         const positionMap = {};
         for (const card of cards) {
@@ -386,17 +393,26 @@ class PvZMatchGame {
     
     renderBoard() {
         const board = document.getElementById('gameBoard');
-        // 保留层数指示器
         const layerIndicator = board.querySelector('.layer-indicator');
         board.innerHTML = '';
         if (layerIndicator) board.appendChild(layerIndicator);
         
-        // 计算最大层数
         const maxLayer = Math.max(...this.cards.map(c => c.layer), 0);
         document.getElementById('layerCount').textContent = maxLayer + 1;
         
+        // 调试：统计可点击的牌
+        let clickableCount = 0;
+        let layer0Count = 0;
+        let layer1Count = 0;
+        
         for (const card of this.cards) {
             if (card.removed) continue;
+            
+            if (card.layer === 0) layer0Count++;
+            if (card.layer === 1) layer1Count++;
+            
+            const clickable = this.isCardClickable(card);
+            if (clickable) clickableCount++;
             
             const cardEl = document.createElement('div');
             cardEl.className = `card ${card.faceUp ? 'face-up' : 'face-down'}`;
@@ -409,14 +425,16 @@ class PvZMatchGame {
                 cardEl.textContent = card.emoji;
             }
             
-            // 检查是否可点击（没有被上层牌完全遮挡）
-            if (this.isCardClickable(card)) {
+            if (clickable) {
                 cardEl.classList.add('clickable');
                 cardEl.addEventListener('click', () => this.handleCardClick(card));
             }
             
             board.appendChild(cardEl);
         }
+        
+        // 输出调试
+        console.log(`🔍 可点击统计：${clickableCount} 张可点击 (layer0: ${layer0Count}, layer1: ${layer1Count})`);
         
         this.updateStats();
     }
