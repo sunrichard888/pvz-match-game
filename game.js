@@ -275,18 +275,42 @@ class PvZMatchGame {
             }
         }
         
-        // 第三步：按组分配 - 确保同堆无重复
-        // 策略：对每堆的每张牌，分配一个这堆没用过的图案
+        // 第三步：按层分配 - 确保同种图案分布在不同层（核心优化！）
+        // 策略：先分配所有 layer=0 的牌，再分配 layer=1，以此类推
+        // 这样同一种图案的 3 张牌会分布在不同层，需要逐层解锁
+        
+        // 按层分组
+        const layerGroups = {};
         for (const stack of stacks) {
-            const usedTypes = new Set(); // 这堆已用的图案类型索引
-            
             for (const card of stack) {
-                // 找一个可用的图案（这堆没用过，且还有剩余）
+                if (!layerGroups[card.layer]) {
+                    layerGroups[card.layer] = [];
+                }
+                layerGroups[card.layer].push(card);
+            }
+        }
+        
+        // 获取所有层（从低到高）
+        const layers = Object.keys(layerGroups).map(Number).sort((a, b) => b - a); // 从顶层开始
+        
+        // 按层分配图案
+        for (const layer of layers) {
+            const cardsInLayer = layerGroups[layer];
+            const usedInLayer = new Set(); // 本层已用的图案
+            
+            for (const card of cardsInLayer) {
+                // 找可用的图案（本层没用过，这堆没用过，且还有剩余）
                 let bestIdx = -1;
                 
-                // 优先选剩余最多的图案
+                // 获取这堆已用的图案
+                const stack = positionGroups[`${card.x - (card.layer * 4)},${card.y + (card.layer * 4)}`];
+                const usedInStack = new Set(stack.filter(c => c.emoji).map(c => {
+                    // 找到图案对应的 typeIdx
+                    return this.pvzEmojis.plants.indexOf(c.emoji);
+                }));
+                
                 for (let i = 0; i < config.cardTypes; i++) {
-                    if (emojiRemaining[i] > 0 && !usedTypes.has(i)) {
+                    if (emojiRemaining[i] > 0 && !usedInLayer.has(i) && !usedInStack.has(i)) {
                         if (bestIdx === -1 || emojiRemaining[i] > emojiRemaining[bestIdx]) {
                             bestIdx = i;
                         }
@@ -297,16 +321,14 @@ class PvZMatchGame {
                     const emoji = this.pvzEmojis.plants[bestIdx % this.pvzEmojis.plants.length];
                     card.emoji = emoji;
                     emojiRemaining[bestIdx]--;
-                    usedTypes.add(bestIdx);
+                    usedInLayer.add(bestIdx);
                 } else {
-                    // 极端情况：所有图案都用过了（堆太高）
-                    // 找一个还有剩余的（即使这堆用过了）
+                    // 找不到理想的，只用确保堆内不重复
                     for (let i = 0; i < config.cardTypes; i++) {
-                        if (emojiRemaining[i] > 0) {
+                        if (emojiRemaining[i] > 0 && !usedInStack.has(i)) {
                             const emoji = this.pvzEmojis.plants[i % this.pvzEmojis.plants.length];
                             card.emoji = emoji;
                             emojiRemaining[i]--;
-                            console.log(`⚠️ 堆内重复：位置 ${card.x},${card.y}, 图案 ${emoji}`);
                             break;
                         }
                     }
