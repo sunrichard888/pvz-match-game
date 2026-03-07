@@ -180,12 +180,29 @@ class PvZMatchGame {
     }
     
     assignEmojisRandomly(cards, config) {
-        // 创建 emoji 池（确保每种图案数量是 3 的倍数）
-        const emojiPool = [];
+        // 第一步：按位置分组（同一 x,y 坐标的牌是一堆）
+        const positionGroups = {};
+        for (const card of cards) {
+            const key = `${card.x},${card.y}`;
+            if (!positionGroups[key]) {
+                positionGroups[key] = [];
+            }
+            positionGroups[key].push(card);
+        }
+        
+        const stacks = Object.values(positionGroups);
+        const maxStackHeight = Math.max(...stacks.map(s => s.length));
+        
+        // 检查：如果图案种类数 < 最大堆高，无法避免同堆重复
+        if (config.cardTypes < maxStackHeight) {
+            console.warn(`警告：图案种类 (${config.cardTypes}) < 最大堆高 (${maxStackHeight})，可能有重复`);
+        }
+        
+        // 第二步：创建 emoji 池（每种图案 3 的倍数）
+        const emojiList = [];
         const cardsPerType = [];
         let remainingCards = cards.length;
         
-        // 计算每种图案的牌数
         for (let i = 0; i < config.cardTypes; i++) {
             const count = Math.min(
                 Math.max(3, Math.floor(Math.random() * 3) * 3 + 3),
@@ -195,27 +212,56 @@ class PvZMatchGame {
             remainingCards -= count;
         }
         
-        // 分配剩余牌
         while (remainingCards > 0) {
             const idx = Math.floor(Math.random() * config.cardTypes);
             cardsPerType[idx] += 3;
             remainingCards -= 3;
         }
         
-        // 填充 emoji 池
         for (let i = 0; i < config.cardTypes; i++) {
             const emoji = this.pvzEmojis.plants[i % this.pvzEmojis.plants.length];
             for (let j = 0; j < cardsPerType[i]; j++) {
-                emojiPool.push(emoji);
+                emojiList.push({ emoji, typeIdx: i });
             }
         }
         
-        // 关键：完全打乱 emoji 池
-        this.shuffleArray(emojiPool);
+        // 第三步：按组分配 - 确保同堆无重复
+        const emojiRemaining = [...cardsPerType]; // 每种图案剩余数量
         
-        // 分配给所有牌
-        for (let i = 0; i < cards.length; i++) {
-            cards[i].emoji = emojiPool[i];
+        for (const stack of stacks) {
+            const usedTypes = new Set(); // 这堆已用的图案类型索引
+            
+            for (const card of stack) {
+                // 找一个可用的图案（这堆没用过，且还有剩余）
+                let bestIdx = -1;
+                
+                // 优先选剩余最多的图案
+                for (let i = 0; i < config.cardTypes; i++) {
+                    if (emojiRemaining[i] > 0 && !usedTypes.has(i)) {
+                        if (bestIdx === -1 || emojiRemaining[i] > emojiRemaining[bestIdx]) {
+                            bestIdx = i;
+                        }
+                    }
+                }
+                
+                if (bestIdx !== -1) {
+                    const emoji = this.pvzEmojis.plants[bestIdx % this.pvzEmojis.plants.length];
+                    card.emoji = emoji;
+                    emojiRemaining[bestIdx]--;
+                    usedTypes.add(bestIdx);
+                } else {
+                    // 极端情况：所有图案都用过了
+                    // 找一个还有剩余的（即使这堆用过了）
+                    for (let i = 0; i < config.cardTypes; i++) {
+                        if (emojiRemaining[i] > 0) {
+                            const emoji = this.pvzEmojis.plants[i % this.pvzEmojis.plants.length];
+                            card.emoji = emoji;
+                            emojiRemaining[i]--;
+                            break;
+                        }
+                    }
+                }
+            }
         }
     }
     
