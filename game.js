@@ -195,39 +195,29 @@ class PvZMatchGame {
         
         // 检查：如果图案种类数 < 最大堆高，无法避免同堆重复
         if (config.cardTypes < maxStackHeight) {
-            console.warn(`警告：图案种类 (${config.cardTypes}) < 最大堆高 (${maxStackHeight})，可能有重复`);
+            console.warn(`⚠️ 图案种类 (${config.cardTypes}) < 最大堆高 (${maxStackHeight})，可能有重复`);
         }
         
-        // 第二步：创建 emoji 池（每种图案 3 的倍数）
-        const emojiList = [];
-        const cardsPerType = [];
-        let remainingCards = cards.length;
+        // 第二步：创建 emoji 池（平均分配，确保每种数量接近）
+        const totalCards = cards.length;
+        const baseCount = Math.floor(totalCards / config.cardTypes);
+        const remainder = totalCards % config.cardTypes;
         
+        const emojiRemaining = [];
         for (let i = 0; i < config.cardTypes; i++) {
-            const count = Math.min(
-                Math.max(3, Math.floor(Math.random() * 3) * 3 + 3),
-                remainingCards - (config.cardTypes - i - 1) * 3
-            );
-            cardsPerType.push(count);
-            remainingCards -= count;
+            // 前 remainder 种图案多 1 张
+            emojiRemaining.push(baseCount + (i < remainder ? 1 : 0));
         }
         
-        while (remainingCards > 0) {
-            const idx = Math.floor(Math.random() * config.cardTypes);
-            cardsPerType[idx] += 3;
-            remainingCards -= 3;
-        }
-        
+        // 确保每种是 3 的倍数
         for (let i = 0; i < config.cardTypes; i++) {
-            const emoji = this.pvzEmojis.plants[i % this.pvzEmojis.plants.length];
-            for (let j = 0; j < cardsPerType[i]; j++) {
-                emojiList.push({ emoji, typeIdx: i });
+            while (emojiRemaining[i] % 3 !== 0) {
+                emojiRemaining[i] += 3;
             }
         }
         
         // 第三步：按组分配 - 确保同堆无重复
-        const emojiRemaining = [...cardsPerType]; // 每种图案剩余数量
-        
+        // 策略：对每堆的每张牌，分配一个这堆没用过的图案
         for (const stack of stacks) {
             const usedTypes = new Set(); // 这堆已用的图案类型索引
             
@@ -250,19 +240,31 @@ class PvZMatchGame {
                     emojiRemaining[bestIdx]--;
                     usedTypes.add(bestIdx);
                 } else {
-                    // 极端情况：所有图案都用过了
+                    // 极端情况：所有图案都用过了（堆太高）
                     // 找一个还有剩余的（即使这堆用过了）
                     for (let i = 0; i < config.cardTypes; i++) {
                         if (emojiRemaining[i] > 0) {
                             const emoji = this.pvzEmojis.plants[i % this.pvzEmojis.plants.length];
                             card.emoji = emoji;
                             emojiRemaining[i]--;
+                            console.log(`⚠️ 堆内重复：位置 ${card.x},${card.y}, 图案 ${emoji}`);
                             break;
                         }
                     }
                 }
             }
         }
+        
+        // 第四步：验证并输出统计
+        let conflictCount = 0;
+        for (const stack of stacks) {
+            const emojis = stack.map(c => c.emoji);
+            const unique = new Set(emojis);
+            if (unique.size !== emojis.length) {
+                conflictCount++;
+            }
+        }
+        console.log(`✅ 关卡 ${this.level}: ${stacks.length} 堆，最大堆高 ${maxStackHeight}, 冲突堆数 ${conflictCount}`);
     }
     
     generateLayerPositions(count, boardWidth, boardHeight, cardWidth, cardHeight, layer, totalLayers) {
