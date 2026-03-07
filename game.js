@@ -114,59 +114,44 @@ class PvZMatchGame {
         const cardWidth = 60;
         const cardHeight = 60;
         
-        // 第一步：先分配位置（不考虑图案）
-        // 创建层结构（不规则分布）
-        const layers = [];
-        for (let l = 0; l < config.layers; l++) {
-            const layerRatio = 1 - (l / config.layers) * 0.6;
-            const cardsInLayer = Math.floor(cards.length / config.layers * layerRatio);
-            layers.push({
-                layer: l,
-                cardCount: cardsInLayer,
-                cards: []
-            });
-        }
+        // 第一步：生成堆叠位置（关键：确保有真正的堆叠）
+        // 策略：先生成底层位置，然后在上层叠加
+        const positions = [];
+        const basePositions = this.generateBasePositions(
+            config.totalCards,
+            config.layers,
+            boardWidth,
+            boardHeight,
+            cardWidth,
+            cardHeight
+        );
         
-        // 分配牌到各层
+        // 第二步：分配牌到位置（每个位置可能有多个层）
         let cardIndex = 0;
-        for (const layer of layers) {
-            for (let i = 0; i < layer.cardCount && cardIndex < cards.length; i++) {
-                cards[cardIndex].layer = layer.layer;
-                layer.cards.push(cards[cardIndex]);
+        for (const pos of basePositions) {
+            for (let l = 0; l < pos.layers && cardIndex < cards.length; l++) {
+                cards[cardIndex].layer = l;
+                cards[cardIndex].x = pos.x + (l * 3); // 每层偏移 3px
+                cards[cardIndex].y = pos.y - (l * 3); // 向上偏移
                 cardIndex++;
             }
         }
         
-        // 剩余牌随机分配到各层
+        // 剩余牌随机添加到已有位置（增加堆高）
         while (cardIndex < cards.length) {
-            const randomLayer = layers[Math.floor(Math.random() * layers.length)];
-            cards[cardIndex].layer = randomLayer.layer;
-            randomLayer.cards.push(cards[cardIndex]);
+            const randomPos = basePositions[Math.floor(Math.random() * basePositions.length)];
+            const newLayer = randomPos.layers;
+            cards[cardIndex].layer = newLayer;
+            cards[cardIndex].x = randomPos.x + (newLayer * 3);
+            cards[cardIndex].y = randomPos.y - (newLayer * 3);
+            randomPos.layers++;
             cardIndex++;
         }
         
-        // 为每层生成位置
-        for (const layer of layers) {
-            const positions = this.generateLayerPositions(
-                layer.cards.length,
-                boardWidth,
-                boardHeight,
-                cardWidth,
-                cardHeight,
-                layer.layer,
-                config.layers
-            );
-            
-            for (let i = 0; i < layer.cards.length; i++) {
-                layer.cards[i].x = positions[i].x;
-                layer.cards[i].y = positions[i].y;
-            }
-        }
-        
-        // 第二步：随机分配图案（关键：让同种图案分散）
+        // 第三步：随机分配图案
         this.assignEmojisRandomly(cards, config);
         
-        // 第三步：设置反面牌
+        // 第四步：设置反面牌
         for (const card of cards) {
             if (Math.random() < this.faceDownRatio) {
                 card.faceUp = false;
@@ -176,7 +161,52 @@ class PvZMatchGame {
         // 排序：底层先绘制，上层后绘制
         cards.sort((a, b) => a.layer - b.layer);
         
+        // 输出调试信息
+        const positionGroups = {};
+        for (const card of cards) {
+            const key = `${card.x},${card.y}`;
+            positionGroups[key] = (positionGroups[key] || 0) + 1;
+        }
+        const stackHeights = Object.values(positionGroups);
+        console.log(`📊 堆叠统计：${Object.keys(positionGroups).length} 堆，最大高度 ${Math.max(...stackHeights)}, 最小高度 ${Math.min(...stackHeights)}`);
+        
         return cards;
+    }
+    
+    generateBasePositions(totalCards, maxLayers, boardWidth, boardHeight, cardWidth, cardHeight) {
+        // 计算需要多少个基础位置
+        // 假设平均每堆 2-4 层，计算位置数
+        const avgStackHeight = 2 + Math.floor(maxLayers / 2);
+        const positionCount = Math.ceil(totalCards / avgStackHeight);
+        
+        const positions = [];
+        const centerX = boardWidth / 2;
+        const centerY = boardHeight / 2;
+        const maxRadius = Math.min(boardWidth, boardHeight) / 2 - cardWidth;
+        
+        // 使用螺旋分布生成位置
+        for (let i = 0; i < positionCount; i++) {
+            const angle = (i / positionCount) * Math.PI * 2 * 2.5;
+            const radius = Math.sqrt(i / positionCount) * maxRadius;
+            
+            const x = centerX + Math.cos(angle) * radius - cardWidth / 2;
+            const y = centerY + Math.sin(angle) * radius - cardHeight / 2;
+            
+            // 确保在边界内
+            const clampedX = Math.max(10, Math.min(x, boardWidth - cardWidth - 10));
+            const clampedY = Math.max(10, Math.min(y, boardHeight - cardHeight - 10));
+            
+            // 每堆的层数（1 到 maxLayers 之间）
+            const layers = Math.max(1, Math.min(maxLayers, Math.floor(Math.random() * maxLayers) + 1));
+            
+            positions.push({
+                x: clampedX,
+                y: clampedY,
+                layers: layers
+            });
+        }
+        
+        return positions;
     }
     
     assignEmojisRandomly(cards, config) {
