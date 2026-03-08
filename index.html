@@ -4,155 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>植物大战僵尸 - 萌萌消</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Microsoft YaHei', sans-serif;
-            background: linear-gradient(135deg, #1a472a, #2d5a3f);
-            min-height: 100vh;
-            padding: 20px;
-            color: white;
-        }
-        .game-container { max-width: 500px; margin: 0 auto; }
-        .game-header {
-            text-align: center;
-            background: rgba(255,255,255,0.1);
-            padding: 15px;
-            border-radius: 15px;
-            margin-bottom: 15px;
-        }
-        .game-title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
-        .stats { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-        .stat-item {
-            background: rgba(255,255,255,0.2);
-            padding: 8px 12px;
-            border-radius: 15px;
-            font-size: 14px;
-        }
-        .stat-label { color: #90EE90; font-weight: bold; margin-right: 5px; }
-        .controls { display: flex; justify-content: center; gap: 8px; }
-        .game-board {
-            position: relative;
-            background: rgba(0,0,0,0.3);
-            padding: 20px;
-            border-radius: 15px;
-            min-height: 450px;
-            margin-bottom: 15px;
-        }
-        .card {
-            position: absolute;
-            width: 55px;
-            height: 55px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 36px;
-            user-select: none;
-            border-radius: 8px;
-            /* 正面：浅色背景 + 立体感 */
-            background: linear-gradient(145deg, #f8f8f8, #e8e8e8);
-            border: 2px solid #333;
-            /* 立体阴影效果 */
-            box-shadow: 
-                0 6px 0 #b0b0b0,
-                0 8px 10px rgba(0,0,0,0.4),
-                inset 0 2px 4px rgba(255,255,255,0.8),
-                inset 0 -2px 4px rgba(0,0,0,0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .card.face-up { 
-            background: linear-gradient(145deg, #ffffff, #f5f5f5);
-            border-color: #228B22;
-            box-shadow: 
-                0 6px 0 #88aa88,
-                0 8px 10px rgba(0,0,0,0.4),
-                inset 0 2px 4px rgba(255,255,255,0.9),
-                inset 0 -2px 4px rgba(0,0,0,0.1);
-        }
-        .card.face-down { 
-            background: linear-gradient(145deg, #a0522d, #6b3e0b);
-            border-color: #3d1f04;
-            box-shadow: 
-                0 6px 0 #4a2f0f,
-                0 8px 10px rgba(0,0,0,0.5),
-                inset 0 2px 4px rgba(255,255,255,0.3),
-                inset 0 -2px 4px rgba(0,0,0,0.2);
-        }
-        .card.face-down::after {
-            content: "";
-            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.1) 10px, transparent 10px, transparent 20px);
-            width: 100%; height: 100%; border-radius: 6px;
-        }
-        .card.clickable:hover { filter: brightness(1.2); }
-        .card-to-hand {
-            position: fixed;
-            z-index: 2000;
-            pointer-events: none;
-            transition: all 0.5s ease-out;
-        }
-        .hand-area {
-            background: rgba(0,0,0,0.3);
-            padding: 15px;
-            border-radius: 15px;
-        }
-        .hand-title { text-align: center; margin-bottom: 10px; color: #90EE90; }
-        .hand-slots { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; min-height: 65px; }
-        .hand-slot {
-            width: 55px; height: 55px;
-            border: 2px dashed rgba(144,238,144,0.4);
-            border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 32px; background: rgba(0,0,0,0.2);
-        }
-        .hand-slot.filled { border-style: solid; border-color: #90EE90; }
-        button {
-            padding: 8px 16px;
-            font-size: 14px;
-            font-weight: bold;
-            border: none;
-            border-radius: 15px;
-            background: linear-gradient(145deg, #4CAF50, #2E7D32);
-            color: white;
-            cursor: pointer;
-        }
-        button:hover { transform: translateY(-2px); }
-        button.danger { background: linear-gradient(145deg, #f44336, #c62828); }
-        .message-overlay {
-            position: fixed; top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 3000;
-        }
-        .message-box {
-            background: linear-gradient(145deg, #1a472a, #0d2818);
-            padding: 30px;
-            border-radius: 20px;
-            text-align: center;
-            border: 3px solid #90EE90;
-        }
-        .layer-indicator {
-            position: absolute;
-            top: 10px; right: 10px;
-            background: rgba(0,0,0,0.6);
-            padding: 5px 10px;
-            border-radius: 8px;
-            font-size: 12px;
-        }
-    </style>
+    <link rel="stylesheet" href="css/game.css">
 </head>
 <body>
     <div class="game-container">
         <div class="game-header">
             <div class="game-title">🌻 植物大战僵尸 - 萌萌消 🧟</div>
             <div class="stats">
-                <div class="stat-item"><span class="stat-label">关卡:</span><span id="level">1</span></div>
-                <div class="stat-item"><span class="stat-label">剩余:</span><span id="remaining">0</span></div>
-                <div class="stat-item"><span class="stat-label">分数:</span><span id="score">0</span></div>
-                <div class="stat-item"><span class="stat-label">时间:</span><span id="timer">09:00</span></div>
+                <div class="stat-item"><span class="stat-label">关卡:</span><span class="stat-value" id="level">1</span></div>
+                <div class="stat-item"><span class="stat-label">剩余:</span><span class="stat-value" id="remaining">0</span></div>
+                <div class="stat-item"><span class="stat-label">分数:</span><span class="stat-value" id="score">0</span></div>
+                <div class="stat-item"><span class="stat-label">时间:</span><span class="stat-value" id="timer">09:00</span></div>
             </div>
             <div class="controls">
                 <button id="pauseBtn">⏸️</button>
@@ -176,8 +38,10 @@
         <div class="message-box">
             <h2>🎉 恭喜！🎉</h2>
             <p>分数：<span id="finalScoreWin">0</span></p>
-            <button onclick="game.nextLevel()">下一关</button>
-            <button onclick="game.newGame()">新游戏</button>
+            <div class="buttons">
+                <button onclick="game.nextLevel()">下一关</button>
+                <button onclick="game.newGame()">新游戏</button>
+            </div>
         </div>
     </div>
     
@@ -185,11 +49,13 @@
         <div class="message-box">
             <h2>💀 游戏结束 💀</h2>
             <p id="loseReason"></p>
-            <button onclick="game.restartLevel()">重试</button>
-            <button onclick="game.newGame()">新游戏</button>
+            <div class="buttons">
+                <button onclick="game.restartLevel()">重试</button>
+                <button onclick="game.newGame()">新游戏</button>
+            </div>
         </div>
     </div>
 
-    <script src="game.js?v=2026030827"></script>
+    <script src="game.js?v=2026030829"></script>
 </body>
 </html>

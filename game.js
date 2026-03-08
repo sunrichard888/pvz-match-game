@@ -212,20 +212,24 @@ class PvZMatchGame {
             if (card.removed || handIds.has(card.id)) continue;
             count++;
             
-            const el = document.createElement('div');
-            el.className = 'card ' + (card.faceUp ? 'face-up' : 'face-down');
-            el.dataset.id = card.id;
-            el.style.left = card.x + 'px';
-            el.style.top = card.y + 'px';
-            el.style.zIndex = card.layer + 1;
-            if (card.rotation) el.style.transform = 'rotate(' + card.rotation + 'deg)';
-            if (card.faceUp) el.textContent = card.emoji;
+            const cardEl = document.createElement('div');
+            cardEl.className = 'card ' + (card.faceUp ? 'face-up' : 'face-down');
+            cardEl.dataset.id = card.id;
+            // ✅ 使用 transform 代替 left/top
+            cardEl.style.transform = `translate3d(${card.x}px, ${card.y}px, 0)`;
+            cardEl.style.zIndex = card.layer + 1;
+            if (card.rotation) {
+                cardEl.style.transform += ` rotate(${card.rotation}deg)`;
+            }
+            if (card.faceUp) {
+                cardEl.textContent = card.emoji;
+            }
             
             if (this.isCardClickable(card)) {
-                el.classList.add('clickable');
-                el.addEventListener('click', () => this.handleCardClick(card));
+                cardEl.classList.add('clickable');
+                cardEl.addEventListener('click', () => this.handleCardClick(card));
             }
-            fragment.appendChild(el);
+            fragment.appendChild(cardEl);
         }
         
         board.innerHTML = '';
@@ -280,59 +284,80 @@ class PvZMatchGame {
         if (el && targetRect) {
             // 创建克隆用于动画
             const clone = el.cloneNode(true);
-            clone.style.position = 'fixed';
-            clone.style.zIndex = '9999';
-            clone.style.pointerEvents = 'none';
-            clone.style.transition = 'none';
-            
-            const rect = el.getBoundingClientRect();
-            clone.style.left = rect.left + 'px';
-            clone.style.top = rect.top + 'px';
-            clone.style.width = rect.width + 'px';
-            clone.style.height = rect.height + 'px';
+            clone.style.cssText = `
+                position: fixed;
+                z-index: 9999;
+                pointer-events: none;
+                left: ${el.getBoundingClientRect().left}px;
+                top: ${el.getBoundingClientRect().top}px;
+                width: ${el.offsetWidth}px;
+                height: ${el.offsetHeight}px;
+                transform: translateZ(0);
+                will-change: transform, opacity;
+            `;
             document.body.appendChild(clone);
             
             // 隐藏原牌
             el.style.opacity = '0';
             
             // 动画：先向上，再向手牌区
-            const midX = rect.left + (targetRect.left - rect.left) / 2;
-            const midY = rect.top - 100;
+            const startX = el.getBoundingClientRect().left;
+            const startY = el.getBoundingClientRect().top;
+            const midX = startX + (targetRect.left - startX) / 2;
+            const midY = startY - 100;
             
-            requestAnimationFrame(() => {
-                clone.style.transition = 'all 0.2s ease-out';
-                clone.style.left = midX + 'px';
-                clone.style.top = midY + 'px';
-                clone.style.transform = 'scale(0.9)';
-            });
+            // 使用 requestAnimationFrame 进行平滑动画
+            const startTime = performance.now();
+            const duration = 450;
             
-            // 动画结束后，更新手牌区
-            setTimeout(() => {
-                clone.style.transition = 'all 0.25s ease-in';
-                clone.style.left = targetRect.left + 'px';
-                clone.style.top = targetRect.top + 'px';
-                clone.style.transform = 'scale(0.7) rotate(180deg)';
-                clone.style.opacity = '0.3';
-            }, 200);
-            
-            // 动画完全结束后，更新手牌并检查消除
-            setTimeout(() => { 
-                clone.remove();
+            const animate = (currentTime) => {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
                 
-                // 先渲染手牌区（让用户看到牌已加入）
-                this.renderHand();
-                this.updateStats();
+                // 缓动函数
+                const eased = progress < 0.5 
+                    ? 4 * progress * progress * progress 
+                    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
                 
-                // 短暂延迟后再检查消除（让用户看清）
-                setTimeout(() => {
-                    const hasMatch = this.checkMatches();
+                if (progress < 0.44) {
+                    // 第一阶段：向上移动
+                    const phase1Progress = progress / 0.44;
+                    const x = startX + (midX - startX) * phase1Progress;
+                    const y = startY + (midY - startY) * phase1Progress;
+                    const scale = 1 - phase1Progress * 0.1;
+                    clone.style.transform = `translate3d(${x - startX}px, ${y - startY}px, 0) scale(${scale})`;
+                } else {
+                    // 第二阶段：向手牌区移动
+                    const phase2Progress = (progress - 0.44) / 0.56;
+                    const x = midX + (targetRect.left - midX) * phase2Progress;
+                    const y = midY + (targetRect.top - midY) * phase2Progress;
+                    const scale = 0.9 - phase2Progress * 0.2;
+                    const rotation = phase2Progress * 180;
+                    clone.style.transform = `translate3d(${x - startX}px, ${y - startY}px, 0) scale(${scale}) rotate(${rotation}deg)`;
+                    clone.style.opacity = 1 - phase2Progress * 0.7;
+                }
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    // 动画结束
+                    clone.remove();
                     
-                    // 如果没有消除，再移除桌面的牌
-                    if (!hasMatch) {
-                        this.renderBoard();
-                    }
-                }, 100);
-            }, 450);
+                    // 渲染手牌区
+                    this.renderHand();
+                    this.updateStats();
+                    
+                    // 短暂延迟后检查消除
+                    setTimeout(() => {
+                        const hasMatch = this.checkMatches();
+                        if (!hasMatch) {
+                            this.renderBoard();
+                        }
+                    }, 100);
+                }
+            };
+            
+            requestAnimationFrame(animate);
         } else {
             // 没有动画，直接更新
             this.renderHand();
