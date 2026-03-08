@@ -1,50 +1,41 @@
-// 植物大战僵尸 - 萌萌消
-// 羊了个羊类型玩法：多层堆叠 + 7 格卡槽 + 部分露出预判机制
+// PvZ Match-3 Game - Core Logic
+// Version: 2026-03-08
 
 class PvZMatchGame {
     constructor() {
-        // 游戏配置
-        this.handSize = 7;           // 卡槽格子数
-        this.baseCardTypes = 12;     // 基础图案种类数
-        this.minCardsPerType = 3;    // 每种图案最少 3 张（保证可消除）
-        this.maxCardsPerType = 9;    // 每种图案最多 9 张（3 的倍数）
-        this.faceDownRatio = 0.15;   // 15% 的牌是反面（降低难度）
-        this.exposeRatio = 0.40;     // 下层牌露出比例（40% 可见，增加预判）
-        this.timeLimit = 9 * 60;     // 9 分钟 = 540 秒
+        this.handSize = 7;
+        this.baseCardTypes = 12;
+        this.faceDownRatio = 0.15;
+        this.exposeRatio = 0.40;
+        this.timeLimit = 9 * 60;
         this.currentTime = this.timeLimit;
         this.timer = null;
         
-        // 植物大战僵尸图案（共 24 种）
         this.pvzEmojis = {
-            // 植物阵营 (12 种)
             plants: ['🌻', '🌱', '🌽', '🍄', '🌵', '🌷', '🌹', '🍀', '🌿', '🥕', '🍅', '🥬'],
-            // 僵尸阵营 (12 种)
-            zombies: ['🧟', '🧠', '💀', '👻', '🦴', '🧛', '🧞', '🧟‍♂️', '🧟‍♀️', '👹', '👺', '💚']
+            zombies: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7', 'Z8', 'Z9', 'Z10', 'Z11', 'Z12']
         };
         
-        // 游戏状态
         this.level = 1;
         this.score = 0;
         this.moves = 0;
-        this.history = [];  // 用于撤回功能
-        this.cards = [];    // 所有牌的数组
-        this.hand = [];     // 卡槽
+        this.history = [];
+        this.cards = [];
+        this.hand = [];
         this.gameActive = false;
         this.isPaused = false;
         
-        // 关卡配置（合理难度曲线，确保可通关）
-        // 设计原则：每关保证至少有 handSize 个可接触牌，避免死局
         this.levelConfigs = [
-            { layers: 2, totalCards: 24, cardTypes: 4, spread: 0.8 },   // 关卡 1: 教学（2 分钟通关）
-            { layers: 3, totalCards: 36, cardTypes: 6, spread: 0.7 },   // 关卡 2: 简单（3 分钟通关）
-            { layers: 3, totalCards: 48, cardTypes: 8, spread: 0.65 },  // 关卡 3: 入门（4 分钟通关）
-            { layers: 4, totalCards: 60, cardTypes: 8, spread: 0.6 },   // 关卡 4: 中等（5 分钟通关）
-            { layers: 4, totalCards: 72, cardTypes: 9, spread: 0.55 },  // 关卡 5: 进阶（6 分钟通关）
-            { layers: 5, totalCards: 84, cardTypes: 10, spread: 0.5 },  // 关卡 6: 困难（7 分钟通关）
-            { layers: 5, totalCards: 96, cardTypes: 10, spread: 0.48 }, // 关卡 7: 挑战（7.5 分钟通关）
-            { layers: 6, totalCards: 108, cardTypes: 12, spread: 0.45 },// 关卡 8: 专家（8 分钟通关）
-            { layers: 6, totalCards: 120, cardTypes: 12, spread: 0.42 },// 关卡 9: 大师（8.5 分钟通关）
-            { layers: 7, totalCards: 132, cardTypes: 14, spread: 0.4 }, // 关卡 10: 传奇（9 分钟通关）
+            { layers: 3, totalCards: 90, cardTypes: 12, spread: 0.9 },
+            { layers: 3, totalCards: 108, cardTypes: 12, spread: 0.85 },
+            { layers: 4, totalCards: 126, cardTypes: 14, spread: 0.8 },
+            { layers: 4, totalCards: 144, cardTypes: 16, spread: 0.75 },
+            { layers: 5, totalCards: 162, cardTypes: 18, spread: 0.7 },
+            { layers: 5, totalCards: 180, cardTypes: 20, spread: 0.65 },
+            { layers: 6, totalCards: 198, cardTypes: 22, spread: 0.6 },
+            { layers: 6, totalCards: 216, cardTypes: 24, spread: 0.55 },
+            { layers: 7, totalCards: 234, cardTypes: 24, spread: 0.5 },
+            { layers: 7, totalCards: 252, cardTypes: 24, spread: 0.45 },
         ];
         
         this.initGame();
@@ -57,655 +48,402 @@ class PvZMatchGame {
     }
     
     getLevelConfig() {
-        const configIndex = Math.min(this.level - 1, this.levelConfigs.length - 1);
-        return this.levelConfigs[configIndex];
+        return this.levelConfigs[Math.min(this.level - 1, this.levelConfigs.length - 1)];
     }
     
     createCards() {
         const config = this.getLevelConfig();
         const cards = [];
-        
-        // 计算每种图案的牌数（确保是 3 的倍数）
         const cardsPerType = [];
-        let remainingCards = config.totalCards;
+        let remaining = config.totalCards;
         
         for (let i = 0; i < config.cardTypes; i++) {
-            // 随机生成 3-9 张（3 的倍数）
-            const count = Math.min(
-                Math.max(3, Math.floor(Math.random() * 3) * 3 + 3),
-                remainingCards - (config.cardTypes - i - 1) * 3
-            );
+            const count = Math.min(Math.max(3, Math.floor(Math.random() * 3) * 3 + 3), remaining - (config.cardTypes - i - 1) * 3);
             cardsPerType.push(count);
-            remainingCards -= count;
+            remaining -= count;
         }
         
-        // 分配剩余牌
-        while (remainingCards > 0) {
+        while (remaining > 0) {
             const idx = Math.floor(Math.random() * config.cardTypes);
             cardsPerType[idx] += 3;
-            remainingCards -= 3;
+            remaining -= 3;
         }
         
-        // 创建所有牌（先不分配 emoji，只创建空牌）
-        let cardId = 0;
+        let id = 0;
         for (let i = 0; i < config.cardTypes; i++) {
             for (let j = 0; j < cardsPerType[i]; j++) {
-                cards.push({
-                    id: cardId++,
-                    emoji: '',  // 暂时为空，后面随机分配
-                    faceUp: true,
-                    removed: false,
-                    layer: 0,
-                    x: 0,
-                    y: 0,
-                    width: 60,
-                    height: 60
-                });
+                cards.push({ id: id++, emoji: '', faceUp: true, removed: false, layer: 0, x: 0, y: 0, width: 60, height: 60, rotation: 0 });
             }
         }
-        
         return cards;
     }
     
     generateStackLayout(cards) {
         const config = this.getLevelConfig();
-        const boardWidth = 480;
-        const boardHeight = 400;
-        const cardSize = 60;
+        const positions = [];
         
-        // 简单直接的堆叠算法：
-        // 1. 创建网格位置（例如 8x6 网格）
-        // 2. 每个网格位置可以有 1-N 层牌
-        // 3. 每层偏移固定像素
-        
-        const gridCols = 8;
-        const gridRows = 6;
-        const gridPositions = [];
-        
-        // 生成网格位置
-        for (let row = 0; row < gridRows; row++) {
-            for (let col = 0; col < gridCols; col++) {
-                const x = 40 + col * 55; // 起始 40px，间隔 55px
-                const y = 40 + row * 55;
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 10; col++) {
+                const baseX = 20 + col * 45;
+                const baseY = 20 + row * 45;
+                const height = Math.floor(Math.random() * config.layers) + 1;
                 
-                // 随机决定这堆有几层（1 到 config.layers）
-                const stackHeight = Math.floor(Math.random() * config.layers) + 1;
-                
-                for (let l = 0; l < stackHeight; l++) {
-                    gridPositions.push({
-                        x: x + (l * 4),  // 每层向右偏移 4px
-                        y: y - (l * 4),  // 每层向上偏移 4px
-                        layer: l
+                for (let l = 0; l < height; l++) {
+                    positions.push({
+                        x: baseX + l * 3 + (Math.random() - 0.5) * 20,
+                        y: baseY - l * 3 + (Math.random() - 0.5) * 20,
+                        layer: l,
+                        rotation: (Math.random() - 0.5) * 30
                     });
                 }
             }
         }
         
-        // 如果位置不够，重复使用一些位置
-        while (gridPositions.length < cards.length) {
-            const randomIdx = Math.floor(Math.random() * gridPositions.length);
-            const basePos = gridPositions[randomIdx];
-            // 在现有最高层上再加一层
-            const newLayer = basePos.layer + 1;
-            gridPositions.push({
-                x: basePos.x + 4,
-                y: basePos.y - 4,
-                layer: newLayer
+        while (positions.length < cards.length) {
+            const base = positions[Math.floor(Math.random() * positions.length)];
+            positions.push({
+                x: base.x + 3 + (Math.random() - 0.5) * 30,
+                y: base.y - 3 + (Math.random() - 0.5) * 30,
+                layer: base.layer + 1,
+                rotation: (Math.random() - 0.5) * 45
             });
         }
         
-        // 分配位置给所有牌
+        for (let i = positions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [positions[i], positions[j]] = [positions[j], positions[i]];
+        }
+        
         for (let i = 0; i < cards.length; i++) {
-            cards[i].x = gridPositions[i].x;
-            cards[i].y = gridPositions[i].y;
-            cards[i].layer = gridPositions[i].layer;
+            cards[i].x = positions[i].x;
+            cards[i].y = positions[i].y;
+            cards[i].layer = positions[i].layer;
+            cards[i].rotation = positions[i].rotation || 0;
         }
         
-        // 调试：统计各层数量
-        const layerCount = {};
+        this.assignEmojis(cards, config);
+        
         for (const card of cards) {
-            layerCount[card.layer] = (layerCount[card.layer] || 0) + 1;
-        }
-        console.log('🔍 层分布:', layerCount);
-        
-        // 统计堆叠情况（使用和 assignEmojisRandomly 一样的还原方法）
-        const positionMap = {};
-        for (const card of cards) {
-            // 还原基础位置：每层偏移 4px
-            const baseX = card.x - (card.layer * 4);
-            const baseY = card.y + (card.layer * 4);
-            const key = `${baseX},${baseY}`;
-            positionMap[key] = (positionMap[key] || 0) + 1;
+            if (Math.random() < this.faceDownRatio) card.faceUp = false;
         }
         
-        const stackHeights = Object.values(positionMap);
-        const maxStack = Math.max(...stackHeights);
-        const minStack = Math.min(...stackHeights);
-        const avgStack = (stackHeights.reduce((a, b) => a + b, 0) / stackHeights.length).toFixed(1);
-        
-        console.log(`📊 堆叠统计：${Object.keys(positionMap).length} 堆，最大高度 ${maxStack}, 最小高度 ${minStack}, 平均 ${avgStack}`);
-        
-        // 输出前 20 张牌
-        console.log('🔍 前 20 张牌:');
-        for (let i = 0; i < Math.min(20, cards.length); i++) {
-            console.log(`  [${i}] x=${cards[i].x}, y=${cards[i].y}, layer=${cards[i].layer}`);
-        }
-        
-        // 显示调试信息
-        this.showDebugInfo(Object.keys(positionMap).length, maxStack, minStack, avgStack);
-        
-        // 分配图案
-        this.assignEmojisRandomly(cards, config);
-        
-        // 设置反面牌
-        for (const card of cards) {
-            if (Math.random() < this.faceDownRatio) {
-                card.faceUp = false;
-            }
-        }
-        
-        // 排序
         cards.sort((a, b) => a.layer - b.layer);
-        
         return cards;
     }
     
-    showDebugInfo(stackCount, maxStack, minStack, avgStack) {
-        const oldDebug = document.getElementById('stackDebug');
-        if (oldDebug) oldDebug.remove();
-        
-        const debugDiv = document.createElement('div');
-        debugDiv.id = 'stackDebug';
-        debugDiv.style.cssText = `
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.8);
-            color: #0f0;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 12px;
-            z-index: 9999;
-            font-family: monospace;
-            border: 1px solid #0f0;
-        `;
-        debugDiv.innerHTML = `
-            <div>📊 堆叠统计</div>
-            <div>堆数：${stackCount}</div>
-            <div>最大高度：${maxStack}</div>
-            <div>最小高度：${minStack}</div>
-            <div>平均高度：${avgStack}</div>
-        `;
-        document.body.appendChild(debugDiv);
-    }
-    
-    assignEmojisRandomly(cards, config) {
-        // 第一步：按位置分组（关键：使用基础位置，不是精确坐标）
-        // 因为每层偏移 4px，需要还原到基础位置
-        const positionGroups = {};
+    assignEmojis(cards, config) {
+        const groups = {};
         for (const card of cards) {
-            // 还原基础位置：每 4px 偏移对应一层
-            const baseX = card.x - (card.layer * 4);
-            const baseY = card.y + (card.layer * 4);
-            const key = `${baseX},${baseY}`;
-            if (!positionGroups[key]) {
-                positionGroups[key] = [];
-            }
-            positionGroups[key].push(card);
+            const key = `${card.x - card.layer * 4},${card.y + card.layer * 4}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(card);
         }
         
-        const stacks = Object.values(positionGroups);
-        const maxStackHeight = Math.max(...stacks.map(s => s.length));
+        const stacks = Object.values(groups);
+        const total = cards.length;
+        const base = Math.floor(total / config.cardTypes);
+        const remainder = total % config.cardTypes;
         
-        console.log(`🔍 分组统计：${stacks.length} 堆，最大堆高 ${maxStackHeight}`);
-        
-        // 检查：如果图案种类数 < 最大堆高，无法避免同堆重复
-        if (config.cardTypes < maxStackHeight) {
-            console.warn(`⚠️ 图案种类 (${config.cardTypes}) < 最大堆高 (${maxStackHeight})，可能有重复`);
-        }
-        
-        // 第二步：创建 emoji 池（平均分配，确保每种数量接近）
-        const totalCards = cards.length;
-        const baseCount = Math.floor(totalCards / config.cardTypes);
-        const remainder = totalCards % config.cardTypes;
-        
-        const emojiRemaining = [];
+        const remaining = [];
         for (let i = 0; i < config.cardTypes; i++) {
-            // 前 remainder 种图案多 1 张
-            emojiRemaining.push(baseCount + (i < remainder ? 1 : 0));
+            let count = base + (i < remainder ? 1 : 0);
+            while (count % 3 !== 0) count++;
+            remaining.push(count);
         }
         
-        // 确保每种是 3 的倍数
-        for (let i = 0; i < config.cardTypes; i++) {
-            while (emojiRemaining[i] % 3 !== 0) {
-                emojiRemaining[i] += 3;
-            }
-        }
-        
-        // 第三步：按层分配 - 确保同种图案分布在不同层（核心优化！）
-        // 策略：先分配所有 layer=0 的牌，再分配 layer=1，以此类推
-        // 这样同一种图案的 3 张牌会分布在不同层，需要逐层解锁
-        
-        // 按层分组
         const layerGroups = {};
         for (const stack of stacks) {
             for (const card of stack) {
-                if (!layerGroups[card.layer]) {
-                    layerGroups[card.layer] = [];
-                }
+                if (!layerGroups[card.layer]) layerGroups[card.layer] = [];
                 layerGroups[card.layer].push(card);
             }
         }
         
-        // 获取所有层（从低到高）
-        const layers = Object.keys(layerGroups).map(Number).sort((a, b) => b - a); // 从顶层开始
+        const layers = Object.keys(layerGroups).map(Number).sort((a, b) => b - a);
         
-        // 按层分配图案
         for (const layer of layers) {
-            const cardsInLayer = layerGroups[layer];
-            const usedInLayer = new Set(); // 本层已用的图案
-            
-            for (const card of cardsInLayer) {
-                // 找可用的图案（本层没用过，这堆没用过，且还有剩余）
-                let bestIdx = -1;
+            const usedInLayer = new Set();
+            for (const card of layerGroups[layer]) {
+                const stack = groups[`${card.x - card.layer * 4},${card.y + card.layer * 4}`];
+                const usedInStack = new Set(stack.filter(c => c.emoji).map(c => c.emoji));
                 
-                // 获取这堆已用的图案
-                const stack = positionGroups[`${card.x - (card.layer * 4)},${card.y + (card.layer * 4)}`];
-                const usedInStack = new Set(stack.filter(c => c.emoji).map(c => {
-                    // 找到图案对应的 typeIdx
-                    return this.pvzEmojis.plants.indexOf(c.emoji);
-                }));
-                
+                let best = -1;
                 for (let i = 0; i < config.cardTypes; i++) {
-                    if (emojiRemaining[i] > 0 && !usedInLayer.has(i) && !usedInStack.has(i)) {
-                        if (bestIdx === -1 || emojiRemaining[i] > emojiRemaining[bestIdx]) {
-                            bestIdx = i;
-                        }
+                    const emoji = this.pvzEmojis.plants[i % 12];
+                    if (remaining[i] > 0 && !usedInLayer.has(i) && !usedInStack.has(emoji)) {
+                        if (best === -1 || remaining[i] > remaining[best]) best = i;
                     }
                 }
                 
-                if (bestIdx !== -1) {
-                    const emoji = this.pvzEmojis.plants[bestIdx % this.pvzEmojis.plants.length];
-                    card.emoji = emoji;
-                    emojiRemaining[bestIdx]--;
-                    usedInLayer.add(bestIdx);
+                if (best !== -1) {
+                    card.emoji = this.pvzEmojis.plants[best % 12];
+                    remaining[best]--;
+                    usedInLayer.add(best);
                 } else {
-                    // 找不到理想的，只用确保堆内不重复
                     for (let i = 0; i < config.cardTypes; i++) {
-                        if (emojiRemaining[i] > 0 && !usedInStack.has(i)) {
-                            const emoji = this.pvzEmojis.plants[i % this.pvzEmojis.plants.length];
+                        const emoji = this.pvzEmojis.plants[i % 12];
+                        if (remaining[i] > 0 && !usedInStack.has(emoji)) {
                             card.emoji = emoji;
-                            emojiRemaining[i]--;
+                            remaining[i]--;
                             break;
                         }
                     }
                 }
             }
         }
-        
-        // 第四步：验证并输出统计
-        let conflictCount = 0;
-        for (const stack of stacks) {
-            const emojis = stack.map(c => c.emoji);
-            const unique = new Set(emojis);
-            if (unique.size !== emojis.length) {
-                conflictCount++;
-            }
-        }
-        console.log(`✅ 关卡 ${this.level}: ${stacks.length} 堆，最大堆高 ${maxStackHeight}, 冲突堆数 ${conflictCount}`);
-    }
-    
-    generateLayerPositions(count, boardWidth, boardHeight, cardWidth, cardHeight, layer, totalLayers) {
-        const positions = [];
-        const availableWidth = boardWidth - cardWidth - 40;
-        const availableHeight = boardHeight - cardHeight - 40;
-        
-        // 中心区域
-        const centerX = boardWidth / 2;
-        const centerY = boardHeight / 2;
-        
-        // 根据层数调整分布范围（越高层越集中）
-        const spreadFactor = 1 - (layer / totalLayers) * 0.5;
-        
-        for (let i = 0; i < count; i++) {
-            let x, y;
-            
-            // 使用螺旋分布，增加自然感
-            const angle = (i / count) * Math.PI * 2 * 2.5;
-            const radius = Math.sqrt(i / count) * Math.min(availableWidth, availableHeight) / 2 * spreadFactor;
-            
-            x = centerX + Math.cos(angle) * radius - cardWidth / 2;
-            y = centerY + Math.sin(angle) * radius - cardHeight / 2;
-            
-            // 添加随机偏移（模拟自然堆叠）
-            x += (Math.random() - 0.5) * 30 * spreadFactor;
-            y += (Math.random() - 0.5) * 30 * spreadFactor;
-            
-            // 确保在边界内
-            x = Math.max(10, Math.min(x, boardWidth - cardWidth - 10));
-            y = Math.max(10, Math.min(y, boardHeight - cardHeight - 10));
-            
-            positions.push({ x, y });
-        }
-        
-        return positions;
     }
     
     renderBoard() {
         const board = document.getElementById('gameBoard');
-        const layerIndicator = board.querySelector('.layer-indicator');
-        board.innerHTML = '';
-        if (layerIndicator) board.appendChild(layerIndicator);
+        if (!board) return;
+        
+        const indicator = board.querySelector('.layer-indicator');
+        const fragment = document.createDocumentFragment();
+        if (indicator) fragment.appendChild(indicator);
         
         const maxLayer = Math.max(...this.cards.map(c => c.layer), 0);
-        document.getElementById('layerCount').textContent = maxLayer + 1;
+        const el = document.getElementById('layerCount');
+        if (el) el.textContent = maxLayer + 1;
         
-        // 调试：统计可点击的牌
-        let clickableCount = 0;
-        let layer0Count = 0;
-        let layer1Count = 0;
+        const handIds = new Set(this.hand.map(c => c.id));
+        let count = 0;
         
         for (const card of this.cards) {
-            if (card.removed) continue;
+            if (card.removed || handIds.has(card.id)) continue;
+            count++;
             
-            if (card.layer === 0) layer0Count++;
-            if (card.layer === 1) layer1Count++;
+            const el = document.createElement('div');
+            el.className = 'card ' + (card.faceUp ? 'face-up' : 'face-down');
+            el.dataset.id = card.id;
+            el.style.left = card.x + 'px';
+            el.style.top = card.y + 'px';
+            el.style.zIndex = card.layer + 1;
+            if (card.rotation) el.style.transform = 'rotate(' + card.rotation + 'deg)';
+            if (card.faceUp) el.textContent = card.emoji;
             
-            const clickable = this.isCardClickable(card);
-            if (clickable) clickableCount++;
-            
-            const cardEl = document.createElement('div');
-            cardEl.className = `card ${card.faceUp ? 'face-up' : 'face-down'}`;
-            cardEl.dataset.id = card.id;
-            cardEl.style.left = `${card.x}px`;
-            cardEl.style.top = `${card.y}px`;
-            cardEl.style.zIndex = card.layer + 1;
-            
-            if (card.faceUp) {
-                cardEl.textContent = card.emoji;
+            if (this.isCardClickable(card)) {
+                el.classList.add('clickable');
+                el.addEventListener('click', () => this.handleCardClick(card));
             }
-            
-            if (clickable) {
-                cardEl.classList.add('clickable');
-                cardEl.addEventListener('click', () => this.handleCardClick(card));
-            }
-            
-            board.appendChild(cardEl);
+            fragment.appendChild(el);
         }
         
-        // 输出调试
-        console.log(`🔍 可点击统计：${clickableCount} 张可点击 (layer0: ${layer0Count}, layer1: ${layer1Count})`);
-        
+        board.innerHTML = '';
+        board.appendChild(fragment);
         this.updateStats();
     }
     
     isCardClickable(card) {
-        // 检查是否有上层牌遮挡这张牌
+        if (card.removed || this.hand.some(c => c.id === card.id)) return false;
+        
+        // 检查是否有上层牌遮挡
         for (const other of this.cards) {
-            if (other.removed || other.id === card.id) continue;
-            if (other.layer <= card.layer) continue;
+            if (other.removed || other.id === card.id || other.layer <= card.layer) continue;
             
-            // 检查重叠（考虑露出比例）
-            const overlap = this.calculateOverlap(card, other);
-            if (overlap > (1 - this.exposeRatio)) {
-                return false; // 被遮挡超过阈值
-            }
+            const overlap = this.calcOverlap(card, other);
+            // 只有遮挡超过 60% 才认为不可点击（原来是 40%）
+            if (overlap > 0.60) return false;
         }
         return true;
     }
     
-    calculateOverlap(card1, card2) {
-        const x1 = card1.x, y1 = card1.y, w1 = card1.width, h1 = card1.height;
-        const x2 = card2.x, y2 = card2.y, w2 = card2.width, h2 = card2.height;
-        
-        const overlapX = Math.max(0, Math.min(x1 + w1, x2 + w2) - Math.max(x1, x2));
-        const overlapY = Math.max(0, Math.min(y1 + h1, y2 + h2) - Math.max(y1, y2));
-        const overlapArea = overlapX * overlapY;
-        const cardArea = w1 * h1;
-        
-        return overlapArea / cardArea;
+    calcOverlap(c1, c2) {
+        const ox = Math.max(0, Math.min(c1.x + 60, c2.x + 60) - Math.max(c1.x, c2.x));
+        const oy = Math.max(0, Math.min(c1.y + 60, c2.y + 60) - Math.max(c1.y, c2.y));
+        return (ox * oy) / 3600;
     }
     
     handleCardClick(card) {
         if (!this.gameActive) return;
         if (!this.isCardClickable(card)) return;
+        
+        // 检查手牌是否已满
         if (this.hand.length >= this.handSize) {
             this.gameOver('卡槽已满！');
             return;
         }
         
-        // 保存历史（用于撤回）
         this.saveHistory();
         
-        // 翻牌
-        card.faceUp = true;
+        // 获取目标位置
+        const slots = document.querySelectorAll('.hand-slot');
+        const targetSlot = slots[this.hand.length - 1];
+        const targetRect = targetSlot ? targetSlot.getBoundingClientRect() : null;
         
-        // 添加到卡槽
+        // 先添加到数据（但不渲染手牌）
+        card.faceUp = true;
         this.hand.push(card);
         this.moves++;
         
-        // 播放动画
-        this.animateCardToHand(card);
-        
-        // 检查是否有下层牌露出
-        this.updateCardVisibility();
-        
-        // 检查消除
-        setTimeout(() => this.checkMatches(), 300);
+        // 桌面牌的动画
+        const el = document.querySelector('.card[data-id="' + card.id + '"]');
+        if (el && targetRect) {
+            // 创建克隆用于动画
+            const clone = el.cloneNode(true);
+            clone.style.position = 'fixed';
+            clone.style.zIndex = '9999';
+            clone.style.pointerEvents = 'none';
+            clone.style.transition = 'none';
+            
+            const rect = el.getBoundingClientRect();
+            clone.style.left = rect.left + 'px';
+            clone.style.top = rect.top + 'px';
+            clone.style.width = rect.width + 'px';
+            clone.style.height = rect.height + 'px';
+            document.body.appendChild(clone);
+            
+            // 隐藏原牌
+            el.style.opacity = '0';
+            
+            // 动画：先向上，再向手牌区
+            const midX = rect.left + (targetRect.left - rect.left) / 2;
+            const midY = rect.top - 100;
+            
+            requestAnimationFrame(() => {
+                clone.style.transition = 'all 0.2s ease-out';
+                clone.style.left = midX + 'px';
+                clone.style.top = midY + 'px';
+                clone.style.transform = 'scale(0.9)';
+            });
+            
+            // 动画结束后，更新手牌区
+            setTimeout(() => {
+                clone.style.transition = 'all 0.25s ease-in';
+                clone.style.left = targetRect.left + 'px';
+                clone.style.top = targetRect.top + 'px';
+                clone.style.transform = 'scale(0.7) rotate(180deg)';
+                clone.style.opacity = '0.3';
+            }, 200);
+            
+            // 动画完全结束后，更新手牌并检查消除
+            setTimeout(() => { 
+                clone.remove();
+                
+                // 先渲染手牌区（让用户看到牌已加入）
+                this.renderHand();
+                this.updateStats();
+                
+                // 短暂延迟后再检查消除（让用户看清）
+                setTimeout(() => {
+                    const hasMatch = this.checkMatches();
+                    
+                    // 如果没有消除，再移除桌面的牌
+                    if (!hasMatch) {
+                        this.renderBoard();
+                    }
+                }, 100);
+            }, 450);
+        } else {
+            // 没有动画，直接更新
+            this.renderHand();
+            this.renderBoard();
+            this.updateStats();
+            this.checkMatches();
+        }
     }
     
-    animateCardToHand(card) {
-        const cardEl = document.querySelector(`.card[data-id="${card.id}"]`);
-        if (!cardEl) return;
-        
-        const rect = cardEl.getBoundingClientRect();
-        const handSlot = document.querySelector('.hand-slot.empty') || 
-                        document.querySelector('.hand-slots');
-        const handRect = handSlot.getBoundingClientRect();
-        
-        const clone = cardEl.cloneNode(true);
-        clone.classList.add('card-to-hand');
-        clone.style.left = `${rect.left}px`;
-        clone.style.top = `${rect.top}px`;
-        clone.style.width = `${rect.width}px`;
-        clone.style.height = `${rect.height}px`;
-        
-        document.body.appendChild(clone);
-        
-        requestAnimationFrame(() => {
-            clone.style.left = `${handRect.left + handRect.width / 2 - rect.width / 2}px`;
-            clone.style.top = `${handRect.top + handRect.height / 2 - rect.height / 2}px`;
-            clone.style.transform = 'scale(0.8)';
-            clone.style.opacity = '0.5';
-        });
-        
-        setTimeout(() => {
-            clone.remove();
-            this.renderHand();
-        }, 500);
-    }
+    // animateToHand removed - animation is now handled in handleCardClick
     
     renderHand() {
-        const handSlots = document.getElementById('handSlots');
-        handSlots.innerHTML = '';
+        const container = document.getElementById('handSlots');
+        if (!container) return;
         
+        container.innerHTML = '';
         for (let i = 0; i < this.handSize; i++) {
             const slot = document.createElement('div');
-            slot.className = 'hand-slot';
-            
-            if (i < this.hand.length) {
-                slot.classList.add('filled');
-                slot.textContent = this.hand[i].emoji;
-                slot.dataset.emoji = this.hand[i].emoji;
-            } else {
-                slot.classList.add('empty');
-            }
-            
-            handSlots.appendChild(slot);
+            slot.className = 'hand-slot' + (i < this.hand.length ? ' filled' : '');
+            const card = this.hand[i];
+            if (card && card.emoji) slot.textContent = card.emoji;
+            container.appendChild(slot);
         }
     }
     
     checkMatches() {
-        // 统计卡槽中每种图案的数量
-        const emojiCount = {};
-        const emojiCards = {};
-        
-        for (const card of this.hand) {
-            if (!emojiCount[card.emoji]) {
-                emojiCount[card.emoji] = 0;
-                emojiCards[card.emoji] = [];
-            }
-            emojiCount[card.emoji]++;
-            emojiCards[card.emoji].push(card);
-        }
-        
-        // 检查是否有 3 张相同的
-        let foundMatch = false;
-        for (const emoji in emojiCount) {
-            if (emojiCount[emoji] >= 3) {
-                // 消除前 3 张
-                const toRemove = emojiCards[emoji].slice(0, 3);
-                this.removeCards(toRemove);
-                this.score += 100 * toRemove.length;
-                foundMatch = true;
-                
-                // 显示连击效果
-                if (emojiCount[emoji] > 3) {
-                    this.showCombo(emojiCount[emoji] - 3);
-                }
-                break;
-            }
-        }
-        
-        this.updateStats();
-        
-        if (foundMatch) {
-            // 检查是否胜利
-            if (this.checkWin()) {
-                setTimeout(() => this.winGame(), 500);
-            }
-        } else {
-            // 检查是否失败（卡槽满且无匹配）
+        if (this.hand.length < 3) {
+            // 手牌未满 3 张，检查是否已满
             if (this.hand.length >= this.handSize) {
                 setTimeout(() => this.gameOver('卡槽已满！'), 300);
             }
+            return false;
         }
-    }
-    
-    removeCards(cards) {
-        for (const card of cards) {
-            card.removed = true;
-            const cardEl = document.querySelector(`.card[data-id="${card.id}"]`);
-            if (cardEl) {
-                cardEl.classList.add('removing');
+        
+        const counts = {};
+        for (const card of this.hand) {
+            if (!card || !card.emoji) continue;
+            counts[card.emoji] = (counts[card.emoji] || 0) + 1;
+        }
+        
+        for (const emoji in counts) {
+            if (counts[emoji] >= 3) {
+                const toRemove = [];
+                for (const card of this.hand) {
+                    if (card.emoji === emoji && toRemove.length < 3) {
+                        toRemove.push(card);
+                    }
+                }
+                
+                // 标记为已移除
+                for (const card of toRemove) card.removed = true;
+                // 从手牌中移除
+                this.hand = this.hand.filter(c => !toRemove.includes(c));
+                this.score += 300;
+                
+                // 重新渲染桌面和手牌
+                this.renderBoard();
+                this.renderHand();
+                this.updateStats();
+                
+                // 检查胜利
+                if (this.checkWin()) setTimeout(() => this.winGame(), 500);
+                return true;
             }
         }
         
-        // 从卡槽移除
-        this.hand = this.hand.filter(c => !cards.includes(c));
+        // 没有匹配，检查是否手牌已满
+        if (this.hand.length >= this.handSize) {
+            setTimeout(() => this.gameOver('卡槽已满！'), 300);
+        }
         
-        setTimeout(() => {
-            this.renderBoard();
-            this.renderHand();
-        }, 400);
+        return false;
     }
     
-    showCombo(count) {
-        const comboText = document.createElement('div');
-        comboText.className = 'combo-text';
-        comboText.textContent = `${count}连击! 🔥`;
-        comboText.style.left = '50%';
-        comboText.style.top = '40%';
-        comboText.style.transform = 'translateX(-50%)';
-        document.body.appendChild(comboText);
-        
-        setTimeout(() => comboText.remove(), 1000);
+    checkWin() { return this.cards.every(c => c.removed); }
+    winGame() { 
+        this.gameActive = false; 
+        const scoreEl = document.getElementById('finalScoreWin'); 
+        if (scoreEl) scoreEl.textContent = this.score; 
+        const winMsg = document.getElementById('winMessage');
+        if (winMsg) winMsg.style.display = 'flex'; 
     }
     
-    updateCardVisibility() {
-        // 更新所有牌的可点击状态
-        this.renderBoard();
-    }
-    
-    checkWin() {
-        return this.cards.every(c => c.removed);
-    }
-    
-    winGame() {
-        this.gameActive = false;
-        
-        // 计算星级（基于时间和步数）
-        const config = this.getLevelConfig();
-        const perfectMoves = config.totalCards / 3;
-        const timeUsed = this.timeLimit - this.currentTime;
-        const perfectTime = this.timeLimit * 0.6; // 60% 时间内完成
-        
-        let stars = 3;
-        if (this.moves > perfectMoves * 1.5 || timeUsed > perfectTime * 1.5) stars = 2;
-        if (this.moves > perfectMoves * 2 || timeUsed > perfectTime * 2) stars = 1;
-        
-        const starText = '★'.repeat(stars) + '☆'.repeat(3 - stars);
-        
-        // 计算剩余时间奖励
-        const timeBonus = Math.floor(this.currentTime / 10);
-        const finalScore = this.score + timeBonus;
-        
-        document.getElementById('finalScoreWin').textContent = finalScore;
-        document.getElementById('finalMovesWin').textContent = this.moves;
-        document.getElementById('finalTimeWin').textContent = this.formatTime(this.timeLimit - this.currentTime);
-        document.getElementById('remainingTimeWin').textContent = this.formatTime(this.currentTime);
-        document.getElementById('starRating').textContent = starText;
-        document.getElementById('winMessage').style.display = 'flex';
-    }
-    
-    formatTime(seconds) {
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        return `${m}分${s}秒`;
-    }
-    
-    gameOver(reason) {
-        this.gameActive = false;
-        document.getElementById('loseReason').textContent = reason;
-        document.getElementById('finalScoreLose').textContent = this.score;
-        document.getElementById('finalLevelLose').textContent = this.level;
-        document.getElementById('finalTimeLose').textContent = this.formatTime(this.timeLimit - this.currentTime);
-        document.getElementById('loseMessage').style.display = 'flex';
+    gameOver(reason) { 
+        this.gameActive = false; 
+        const reasonEl = document.getElementById('loseReason');
+        if (reasonEl) reasonEl.textContent = reason;
+        const loseMsg = document.getElementById('loseMessage');
+        if (loseMsg) loseMsg.style.display = 'flex'; 
     }
     
     saveHistory() {
-        // 保存当前状态用于撤回
-        const state = {
+        this.history.push({
             hand: this.hand.map(c => c.id),
-            cards: this.cards.map(c => ({
-                id: c.id,
-                faceUp: c.faceUp,
-                removed: c.removed
-            })),
+            cards: this.cards.map(c => ({ id: c.id, faceUp: c.faceUp, removed: c.removed })),
             score: this.score,
             moves: this.moves
-        };
-        this.history.push(state);
-        if (this.history.length > 10) this.history.shift(); // 最多保存 10 步
+        });
+        if (this.history.length > 10) this.history.shift();
     }
     
     undo() {
         if (this.history.length === 0 || !this.gameActive) return;
-        
         const state = this.history.pop();
-        
-        // 恢复状态
         this.hand = this.cards.filter(c => state.hand.includes(c.id));
-        for (const cardState of state.cards) {
-            const card = this.cards.find(c => c.id === cardState.id);
-            if (card) {
-                card.faceUp = cardState.faceUp;
-                card.removed = cardState.removed;
-            }
+        for (const s of state.cards) {
+            const card = this.cards.find(c => c.id === s.id);
+            if (card) { card.faceUp = s.faceUp; card.removed = s.removed; }
         }
         this.score = state.score;
         this.moves = state.moves;
-        
         this.renderBoard();
         this.renderHand();
         this.updateStats();
@@ -713,114 +451,65 @@ class PvZMatchGame {
     
     shuffle() {
         if (!this.gameActive) return;
-        
-        // 收集所有未消除的牌
-        const remainingCards = this.cards.filter(c => !c.removed);
-        
-        // 将卡槽中的牌放回
-        for (const card of this.hand) {
-            card.faceUp = false; // 放回后变为反面
-        }
+        const remaining = this.cards.filter(c => !c.removed);
+        for (const card of this.hand) card.faceUp = false;
         this.hand = [];
-        
-        // 重新分配图案（保持数量不变）
-        const emojis = remainingCards.map(c => c.emoji);
-        this.shuffleArray(emojis);
-        for (let i = 0; i < remainingCards.length; i++) {
-            remainingCards[i].emoji = emojis[i];
+        const emojis = remaining.map(c => c.emoji);
+        for (let i = emojis.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [emojis[i], emojis[j]] = [emojis[j], emojis[i]];
         }
-        
-        this.score = Math.max(0, this.score - 50); // 洗牌扣 50 分
-        
+        for (let i = 0; i < remaining.length; i++) remaining[i].emoji = emojis[i];
+        this.score = Math.max(0, this.score - 50);
         this.renderBoard();
         this.renderHand();
         this.updateStats();
     }
     
-    shuffleArray(array) {
-        // Fisher-Yates 洗牌算法
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-    }
-    
     updateStats() {
-        const remaining = this.cards.filter(c => !c.removed).length;
-        document.getElementById('remaining').textContent = remaining;
-        document.getElementById('moves').textContent = this.moves;
-        document.getElementById('score').textContent = this.score;
-        document.getElementById('level').textContent = this.level;
-        this.updateTimerDisplay();
+        const remaining = this.cards.filter(c => !c.removed).length - this.hand.length;
+        const remainingEl = document.getElementById('remaining');
+        const movesEl = document.getElementById('moves');
+        const scoreEl = document.getElementById('score');
+        const levelEl = document.getElementById('level');
+        
+        if (remainingEl) remainingEl.textContent = remaining;
+        if (movesEl) movesEl.textContent = this.moves;
+        if (scoreEl) scoreEl.textContent = this.score;
+        if (levelEl) levelEl.textContent = this.level;
+        
+        this.updateTimer();
     }
     
     startTimer() {
         this.currentTime = this.timeLimit;
-        this.updateTimerDisplay();
-        
-        if (this.timer) {
-            clearInterval(this.timer);
-        }
-        
+        this.updateTimer();
+        if (this.timer) clearInterval(this.timer);
         this.timer = setInterval(() => {
             if (this.gameActive && !this.isPaused) {
                 this.currentTime--;
-                this.updateTimerDisplay();
-                
-                if (this.currentTime <= 0) {
-                    this.gameOver('时间到了！');
-                }
+                this.updateTimer();
+                if (this.currentTime <= 0) this.gameOver('Time!');
             }
         }, 1000);
     }
     
-    updateTimerDisplay() {
-        const minutes = Math.floor(this.currentTime / 60);
-        const seconds = this.currentTime % 60;
-        const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    updateTimer() {
+        const m = Math.floor(this.currentTime / 60);
+        const s = this.currentTime % 60;
+        const timeStr = m.toString().padStart(2, '0') + ':' + s.toString().padStart(2, '0');
         
-        // 查找或创建时间显示元素
-        let timerElement = document.getElementById('timer');
-        if (!timerElement) {
-            // 在 stats 中插入时间显示
+        let timerEl = document.getElementById('timer');
+        if (!timerEl) {
             const statsEl = document.querySelector('.stats');
-            const timerDiv = document.createElement('div');
-            timerDiv.className = 'stat-item';
-            timerDiv.innerHTML = `<span class="stat-label">时间:</span><span class="stat-value" id="timer">${timeStr}</span>`;
-            statsEl.insertBefore(timerDiv, statsEl.firstChild);
-            timerElement = document.getElementById('timer');
+            if (statsEl) {
+                const timerDiv = document.createElement('div');
+                timerDiv.className = 'stat-item';
+                timerDiv.innerHTML = '<span class="stat-label">时间:</span><span class="stat-value" id="timer">' + timeStr + '</span>';
+                statsEl.insertBefore(timerDiv, statsEl.firstChild);
+            }
         } else {
-            timerElement.textContent = timeStr;
-        }
-        
-        // 时间警告
-        timerElement.parentElement.classList.remove('timer-warning', 'timer-critical');
-        if (this.currentTime <= 30) {
-            timerElement.parentElement.classList.add('timer-critical');
-        } else if (this.currentTime <= 60) {
-            timerElement.parentElement.classList.add('timer-warning');
-        }
-    }
-    
-    pauseTimer() {
-        if (this.timer) {
-            clearInterval(this.timer);
-            this.timer = null;
-        }
-    }
-    
-    resumeTimer() {
-        if (!this.timer && this.gameActive) {
-            this.timer = setInterval(() => {
-                if (this.gameActive) {
-                    this.currentTime--;
-                    this.updateTimerDisplay();
-                    
-                    if (this.currentTime <= 0) {
-                        this.gameOver('时间到了！');
-                    }
-                }
-            }, 1000);
+            if (timerEl) timerEl.textContent = timeStr;
         }
     }
     
@@ -853,63 +542,71 @@ class PvZMatchGame {
         this.gameActive = true;
         this.cards = this.createCards();
         this.cards = this.generateStackLayout(this.cards);
-        
-        // 最终验证
-        console.log('✅ startLevel 完成后的坐标:');
-        for (let i = 0; i < Math.min(10, this.cards.length); i++) {
-            console.log(`  [${i}] x=${this.cards[i].x}, y=${this.cards[i].y}, layer=${this.cards[i].layer}`);
-        }
-        
         this.renderBoard();
         this.renderHand();
         this.updateStats();
-        
-        // 每关重置时间（9 分钟）
         this.currentTime = this.timeLimit;
-        this.updateTimerDisplay();
+        this.updateTimer();
     }
     
     bindEvents() {
-        document.getElementById('pauseBtn').addEventListener('click', () => this.togglePause());
-        document.getElementById('shuffleBtn').addEventListener('click', () => this.shuffle());
-        document.getElementById('undoBtn').addEventListener('click', () => this.undo());
-        document.getElementById('newGameBtn').addEventListener('click', () => this.newGame());
+        const pauseBtn = document.getElementById('pauseBtn');
+        const shuffleBtn = document.getElementById('shuffleBtn');
+        const undoBtn = document.getElementById('undoBtn');
+        const newGameBtn = document.getElementById('newGameBtn');
+        
+        if (pauseBtn) pauseBtn.addEventListener('click', () => this.togglePause());
+        if (shuffleBtn) shuffleBtn.addEventListener('click', () => this.shuffle());
+        if (undoBtn) undoBtn.addEventListener('click', () => this.undo());
+        if (newGameBtn) newGameBtn.addEventListener('click', () => this.newGame());
     }
     
     togglePause() {
         this.isPaused = !this.isPaused;
         const pauseBtn = document.getElementById('pauseBtn');
-        
+        if (pauseBtn) pauseBtn.textContent = this.isPaused ? '▶️' : '⏸️';
         if (this.isPaused) {
-            pauseBtn.textContent = '▶️ 继续';
             this.pauseTimer();
-            this.pauseGameVisual();
+            const board = document.getElementById('gameBoard');
+            if (board) {
+                board.style.opacity = '0.5';
+                board.style.pointerEvents = 'none';
+            }
         } else {
-            pauseBtn.textContent = '⏸️ 暂停';
             this.resumeTimer();
-            this.resumeGameVisual();
+            const board = document.getElementById('gameBoard');
+            if (board) {
+                board.style.opacity = '1';
+                board.style.pointerEvents = 'auto';
+            }
         }
     }
     
-    pauseGameVisual() {
-        const board = document.getElementById('gameBoard');
-        board.style.opacity = '0.5';
-        board.style.pointerEvents = 'none';
-    }
-    
-    resumeGameVisual() {
-        const board = document.getElementById('gameBoard');
-        board.style.opacity = '1';
-        board.style.pointerEvents = 'auto';
-    }
+    pauseTimer() { if (this.timer) { clearInterval(this.timer); this.timer = null; } }
+    resumeTimer() { if (!this.timer && this.gameActive) this.startTimer(); }
 }
 
-// 全局游戏实例
 let game;
 
 function initGame() {
+    if (window.game) return;
     game = new PvZMatchGame();
+    window.game = game;
 }
 
-// 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', initGame);
+// Force init
+initGame();
+setTimeout(initGame, 10);
+setTimeout(initGame, 100);
+setTimeout(initGame, 500);
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGame);
+}
+
+window.addEventListener('load', function() {
+    setTimeout(initGame, 10);
+    setTimeout(initGame, 100);
+});
+
+if (typeof window !== 'undefined') window.PvZMatchGame = PvZMatchGame;

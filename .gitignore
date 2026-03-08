@@ -1,0 +1,27 @@
+# Logs
+*.log
+
+# Test files
+test_*.html
+test_*.js
+debug_*.html
+*_test.html
+*_test.js
+
+# Reports
+*_REPORT.md
+*_STATUS.md
+*_SUMMARY.md
+
+# Temporary files
+*.tmp
+*.bak
+index_nocache.html
+
+# Node modules
+node_modules/
+package-lock.json
+
+# Python
+__pycache__/
+*.pyc

@@ -2,391 +2,145 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>植物大战僵尸 - 萌萌消</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-        }
-        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Microsoft YaHei', sans-serif;
-            background: linear-gradient(135deg, #1a472a 0%, #2d5a3f 50%, #1a472a 100%);
+            background: linear-gradient(135deg, #1a472a, #2d5a3f);
             min-height: 100vh;
-            padding: 10px;
+            padding: 20px;
             color: white;
-            overflow-x: hidden;
         }
-        
-        .game-container {
-            max-width: 500px;
-            margin: 0 auto;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        
+        .game-container { max-width: 500px; margin: 0 auto; }
         .game-header {
             text-align: center;
-            background: linear-gradient(145deg, rgba(255,255,255,0.15), rgba(0,0,0,0.2));
-            padding: 12px 20px;
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
             border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255,255,255,0.1);
+            margin-bottom: 15px;
         }
-        
-        .game-title {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
-        
-        .stats {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-        
+        .game-title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+        .stats { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
         .stat-item {
-            background: linear-gradient(145deg, rgba(255,255,255,0.2), rgba(0,0,0,0.3));
-            padding: 8px 16px;
-            border-radius: 20px;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 12px;
+            border-radius: 15px;
             font-size: 14px;
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: all 0.3s ease;
         }
-        
-        .stat-item.timer-warning {
-            background: linear-gradient(145deg, rgba(255, 235, 59, 0.4), rgba(255, 193, 7, 0.3));
-            border-color: #ffeb3b;
-            animation: pulse 1s infinite;
-        }
-        
-        .stat-item.timer-critical {
-            background: linear-gradient(145deg, rgba(244, 67, 54, 0.4), rgba(211, 47, 47, 0.3));
-            border-color: #f44336;
-            animation: pulse 0.5s infinite;
-        }
-        
-        .stat-label {
-            color: #90EE90;
-            font-weight: bold;
-        }
-        
-        .stat-value {
-            font-weight: bold;
-            margin-left: 5px;
-        }
-        
-        .controls {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        
+        .stat-label { color: #90EE90; font-weight: bold; margin-right: 5px; }
+        .controls { display: flex; justify-content: center; gap: 8px; }
         .game-board {
             position: relative;
-            background: linear-gradient(145deg, rgba(0,0,0,0.3), rgba(0,0,0,0.5));
-            padding: 20px 10px;
+            background: rgba(0,0,0,0.3);
+            padding: 20px;
             border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255,255,255,0.1);
-            min-height: 400px;
-            overflow: hidden;
+            min-height: 450px;
+            margin-bottom: 15px;
         }
-        
         .card {
             position: absolute;
-            width: 60px;
-            height: 60px;
+            width: 55px;
+            height: 55px;
             cursor: pointer;
-            transition: transform 0.15s ease, filter 0.15s ease;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 40px;
+            font-size: 36px;
             user-select: none;
-            border-radius: 10px;
-            /* 麻将立体感效果 */
-            background: linear-gradient(145deg, #ffffff, #e8e8e8);
+            border-radius: 8px;
+            /* 正面：浅色背景 + 立体感 */
+            background: linear-gradient(145deg, #f8f8f8, #e8e8e8);
             border: 2px solid #333;
+            /* 立体阴影效果 */
             box-shadow: 
-                0 6px 16px rgba(0, 0, 0, 0.4),
-                0 2px 4px rgba(0, 0, 0, 0.3),
-                inset 0 2px 4px rgba(255, 255, 255, 0.6),
-                inset 0 -2px 4px rgba(0, 0, 0, 0.1);
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.4);
+                0 6px 0 #b0b0b0,
+                0 8px 10px rgba(0,0,0,0.4),
+                inset 0 2px 4px rgba(255,255,255,0.8),
+                inset 0 -2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
         }
-        
-        .card.face-up {
-            background: linear-gradient(145deg, #90EE90, #228B22);
-            border-color: #1a472a;
+        .card.face-up { 
+            background: linear-gradient(145deg, #ffffff, #f5f5f5);
+            border-color: #228B22;
+            box-shadow: 
+                0 6px 0 #88aa88,
+                0 8px 10px rgba(0,0,0,0.4),
+                inset 0 2px 4px rgba(255,255,255,0.9),
+                inset 0 -2px 4px rgba(0,0,0,0.1);
         }
-        
-        .card.face-down {
-            background: linear-gradient(145deg, #8B4513, #5D2906);
+        .card.face-down { 
+            background: linear-gradient(145deg, #a0522d, #6b3e0b);
             border-color: #3d1f04;
-        }
-        
-        .card.face-down::after {
-            content: "🌱";
-            font-size: 28px;
-            opacity: 0.7;
-        }
-        
-        .card.clickable {
-            filter: brightness(1.15);
-        }
-        
-        .card.clickable:hover {
-            transform: scale(1.1) translateY(-5px);
             box-shadow: 
-                0 10px 25px rgba(0, 0, 0, 0.5),
-                0 4px 8px rgba(0, 0, 0, 0.4),
-                inset 0 2px 4px rgba(255, 255, 255, 0.6),
-                inset 0 -2px 4px rgba(0, 0, 0, 0.1);
-            z-index: 1000 !important;
+                0 6px 0 #4a2f0f,
+                0 8px 10px rgba(0,0,0,0.5),
+                inset 0 2px 4px rgba(255,255,255,0.3),
+                inset 0 -2px 4px rgba(0,0,0,0.2);
         }
-        
-        .card.clickable:active {
-            transform: scale(1.05);
+        .card.face-down::after {
+            content: "";
+            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.1) 10px, transparent 10px, transparent 20px);
+            width: 100%; height: 100%; border-radius: 6px;
         }
-        
-        .card.removing {
-            animation: removeCard 0.4s ease-out forwards;
-        }
-        
-        @keyframes removeCard {
-            0% {
-                transform: scale(1);
-                opacity: 1;
-            }
-            50% {
-                transform: scale(1.3) rotate(180deg);
-                opacity: 0.8;
-            }
-            100% {
-                transform: scale(0);
-                opacity: 0;
-            }
-        }
-        
+        .card.clickable:hover { filter: brightness(1.2); }
         .card-to-hand {
             position: fixed;
             z-index: 2000;
             pointer-events: none;
             transition: all 0.5s ease-out;
         }
-        
         .hand-area {
-            background: linear-gradient(145deg, rgba(0,0,0,0.3), rgba(0,0,0,0.5));
+            background: rgba(0,0,0,0.3);
             padding: 15px;
             border-radius: 15px;
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255,255,255,0.1);
         }
-        
-        .hand-title {
-            text-align: center;
-            margin-bottom: 12px;
-            font-size: 16px;
-            color: #90EE90;
-        }
-        
-        .hand-slots {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            min-height: 70px;
-        }
-        
+        .hand-title { text-align: center; margin-bottom: 10px; color: #90EE90; }
+        .hand-slots { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; min-height: 65px; }
         .hand-slot {
-            width: 60px;
-            height: 60px;
-            border: 2px dashed rgba(144, 238, 144, 0.4);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 36px;
-            background: rgba(0, 0, 0, 0.2);
-            transition: all 0.2s ease;
+            width: 55px; height: 55px;
+            border: 2px dashed rgba(144,238,144,0.4);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 32px; background: rgba(0,0,0,0.2);
         }
-        
-        .hand-slot.filled {
-            border-style: solid;
-            border-color: #90EE90;
-            background: linear-gradient(145deg, rgba(144, 238, 144, 0.3), rgba(0, 0, 0, 0.3));
-            animation: slotFill 0.3s ease-out;
-        }
-        
-        @keyframes slotFill {
-            0% { transform: scale(0.8); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-        
-        .hand-slot.matching {
-            animation: slotMatch 0.5s ease-out;
-            background: linear-gradient(145deg, rgba(255, 215, 0, 0.5), rgba(255, 165, 0, 0.3));
-            border-color: gold;
-        }
-        
-        @keyframes slotMatch {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.15); filter: brightness(1.3); }
-        }
-        
+        .hand-slot.filled { border-style: solid; border-color: #90EE90; }
         button {
-            padding: 10px 20px;
+            padding: 8px 16px;
             font-size: 14px;
             font-weight: bold;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-radius: 20px;
+            border: none;
+            border-radius: 15px;
             background: linear-gradient(145deg, #4CAF50, #2E7D32);
             color: white;
             cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }
-        
-        button:hover {
-            background: linear-gradient(145deg, #66BB6A, #43A047);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
-        }
-        
-        button:active {
-            transform: translateY(0);
-        }
-        
-        button.danger {
-            background: linear-gradient(145deg, #f44336, #c62828);
-        }
-        
-        button.danger:hover {
-            background: linear-gradient(145deg, #ef5350, #e53935);
-        }
-        
+        button:hover { transform: translateY(-2px); }
+        button.danger { background: linear-gradient(145deg, #f44336, #c62828); }
         .message-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 3000;
-            padding: 20px;
         }
-        
         .message-box {
             background: linear-gradient(145deg, #1a472a, #0d2818);
             padding: 30px;
             border-radius: 20px;
             text-align: center;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
             border: 3px solid #90EE90;
-            max-width: 400px;
-            width: 100%;
         }
-        
-        .message-box h2 {
-            font-size: 28px;
-            margin-bottom: 20px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
-        
-        .message-box.win h2 {
-            color: #FFD700;
-        }
-        
-        .message-box.lose h2 {
-            color: #f44336;
-        }
-        
-        .message-box p {
-            margin: 10px 0;
-            font-size: 16px;
-        }
-        
-        .message-box .buttons {
-            margin-top: 20px;
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
-        
-        .timer-warning {
-            color: #ffeb3b !important;
-            animation: pulse 1s infinite;
-        }
-        
-        .timer-critical {
-            color: #f44336 !important;
-            animation: pulse 0.5s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-        
-        .combo-text {
-            position: fixed;
-            font-size: 32px;
-            font-weight: bold;
-            color: #FFD700;
-            text-shadow: 0 0 10px rgba(255, 215, 0, 0.8), 2px 2px 4px rgba(0,0,0,0.5);
-            pointer-events: none;
-            z-index: 2500;
-            animation: comboFloat 1s ease-out forwards;
-        }
-        
-        @keyframes comboFloat {
-            0% {
-                transform: scale(0.5) translateY(0);
-                opacity: 0;
-            }
-            50% {
-                transform: scale(1.2) translateY(-20px);
-                opacity: 1;
-            }
-            100% {
-                transform: scale(1) translateY(-50px);
-                opacity: 0;
-            }
-        }
-        
         .layer-indicator {
             position: absolute;
-            top: 10px;
-            right: 10px;
+            top: 10px; right: 10px;
             background: rgba(0,0,0,0.6);
             padding: 5px 10px;
-            border-radius: 10px;
+            border-radius: 8px;
             font-size: 12px;
-        }
-        
-        /* 草坪装饰 */
-        .grass-decoration {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 50px;
-            background: linear-gradient(to bottom, transparent, rgba(26, 71, 42, 0.5));
-            pointer-events: none;
-            z-index: -1;
         }
     </style>
 </head>
@@ -395,72 +149,47 @@
         <div class="game-header">
             <div class="game-title">🌻 植物大战僵尸 - 萌萌消 🧟</div>
             <div class="stats">
-                <div class="stat-item">
-                    <span class="stat-label">关卡:</span>
-                    <span class="stat-value" id="level">1</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">剩余:</span>
-                    <span class="stat-value" id="remaining">0</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">步数:</span>
-                    <span class="stat-value" id="moves">0</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">分数:</span>
-                    <span class="stat-value" id="score">0</span>
-                </div>
+                <div class="stat-item"><span class="stat-label">关卡:</span><span id="level">1</span></div>
+                <div class="stat-item"><span class="stat-label">剩余:</span><span id="remaining">0</span></div>
+                <div class="stat-item"><span class="stat-label">分数:</span><span id="score">0</span></div>
+                <div class="stat-item"><span class="stat-label">时间:</span><span id="timer">09:00</span></div>
             </div>
             <div class="controls">
-                <button id="pauseBtn">⏸️ 暂停</button>
-                <button id="shuffleBtn">🔄 洗牌</button>
-                <button id="undoBtn">↩️ 撤回</button>
-                <button id="newGameBtn" class="danger">🎮 新游戏</button>
+                <button id="pauseBtn">⏸️</button>
+                <button id="shuffleBtn">🔄</button>
+                <button id="undoBtn">↩️</button>
+                <button id="newGameBtn" class="danger">🎮</button>
             </div>
         </div>
         
         <div class="game-board" id="gameBoard">
-            <div class="layer-indicator">层数：<span id="layerCount">0</span></div>
+            <div class="layer-indicator">层:<span id="layerCount">0</span></div>
         </div>
         
         <div class="hand-area">
-            <div class="hand-title">🎒 卡槽 (点击草坪牌放入)</div>
+            <div class="hand-title">🎒 卡槽</div>
             <div class="hand-slots" id="handSlots"></div>
         </div>
     </div>
     
-    <div class="grass-decoration"></div>
-    
     <div class="message-overlay" id="winMessage">
-        <div class="message-box win">
-            <h2>🎉 恭喜通关！ 🎉</h2>
-            <p>🌟 最终得分：<span id="finalScoreWin">0</span></p>
-            <p>📊 使用步数：<span id="finalMovesWin">0</span></p>
-            <p>⏱️ 用时：<span id="finalTimeWin">0 分 0 秒</span></p>
-            <p>⏰ 剩余时间：<span id="remainingTimeWin">0 分 0 秒</span></p>
-            <p>⭐ 星级评价：<span id="starRating">★★★</span></p>
-            <div class="buttons">
-                <button onclick="game.nextLevel()">下一关 ➡️</button>
-                <button onclick="game.newGame()">再玩一局</button>
-            </div>
+        <div class="message-box">
+            <h2>🎉 恭喜！🎉</h2>
+            <p>分数：<span id="finalScoreWin">0</span></p>
+            <button onclick="game.nextLevel()">下一关</button>
+            <button onclick="game.newGame()">新游戏</button>
         </div>
     </div>
     
     <div class="message-overlay" id="loseMessage">
-        <div class="message-box lose">
+        <div class="message-box">
             <h2>💀 游戏结束 💀</h2>
-            <p id="loseReason">卡槽已满！</p>
-            <p>📊 最终得分：<span id="finalScoreLose">0</span></p>
-            <p>🏆 到达关卡：<span id="finalLevelLose">1</span></p>
-            <p>⏱️ 生存时间：<span id="finalTimeLose">0 分 0 秒</span></p>
-            <div class="buttons">
-                <button onclick="game.restartLevel()">重试本关 🔄</button>
-                <button onclick="game.newGame()">重新开始</button>
-            </div>
+            <p id="loseReason"></p>
+            <button onclick="game.restartLevel()">重试</button>
+            <button onclick="game.newGame()">新游戏</button>
         </div>
     </div>
 
-    <script src="game.js?v=1.5.1"></script>
+    <script src="game.js?v=2026030827"></script>
 </body>
 </html>
