@@ -21,10 +21,20 @@
 
 ```
 pvz-match-game/
-├── index.html      # 游戏主页面
-├── game.js         # 游戏逻辑
-└── README.md       # 说明文档
+├── index.html      # 游戏主页面 - HTML 结构和 UI 布局
+├── game.js         # 游戏逻辑 - 核心游戏引擎和状态管理
+├── css/
+│   └── game.css    # 样式表 - 3D 卡牌效果和动画
+├── README.md       # 说明文档 - 本文件
+└── RELEASE.md      # 发布说明 - 版本更新历史
 ```
+
+### 核心模块
+
+- **PvZMatchGame 类**: 主游戏控制器，管理游戏状态、卡牌生成、消除逻辑
+- **渲染系统**: 使用 requestAnimationFrame 实现 60FPS 流畅动画
+- **碰撞检测**: 卡牌堆叠层级管理和可点击判定
+- **计时系统**: 9 分钟倒计时和超时处理
 
 ## 🚀 如何运行
 
@@ -79,3 +89,36 @@ python -m http.server 8000
 ## 📄 许可证
 
 MIT License
+
+## 🤝 贡献指南
+
+欢迎提交 Issue 和 Pull Request！
+
+### 开发环境设置
+
+```bash
+git clone https://github.com/sunrichard888/pvz-match-game.git
+cd pvz-match-game
+# 使用任意 HTTP 服务器启动
+python -m http.server 8000
+```
+
+### 代码结构
+
+- `game.js`: 核心游戏逻辑（~600 行）
+  - `constructor()`: 初始化游戏配置和状态
+  - `createCards()`: 生成卡牌数据
+  - `generateStackLayout()`: 创建堆叠布局
+  - `assignEmojis()`: 分配植物图案
+  - `renderBoard()`: 渲染游戏桌面
+  - `handleCardClick()`: 处理点击事件
+  - `checkMatches()`: 检测消除组合
+
+### 提交规范
+
+- `feat:` 新功能
+- `fix:` 修复 bug
+- `docs:` 文档更新
+- `style:` 代码格式
+- `refactor:` 重构
+- `perf:` 性能优化
