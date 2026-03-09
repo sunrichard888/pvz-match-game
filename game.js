@@ -1,78 +1,147 @@
-// PvZ Match-3 Game - Core Logic
+/**
+ * PvZ Match-3 Game - Core Logic
+ * 植物大战僵尸主题的羊了个羊类型消除游戏
+ * 
+ * @version 1.1
+ * @date 2026-03-08
+ * @author sunrichard888
+ * 
+ * @description
+ * 核心游戏引擎，包含以下主要功能：
+ * - 卡牌生成和布局（支持多层堆叠）
+ * - 植物图案分配（12 种植物 emoji）
+ * - 点击交互和手牌管理
+ * - 三消匹配检测和消除
+ * - 计时器和游戏状态管理
+ * - 60FPS 流畅动画渲染
+ * 
+ * @class PvZMatchGame
+ * @property {number} handSize - 手牌区最大容量（7 张）
+ * @property {number} baseCardTypes - 基础图案种类数（12 种）
+ * @property {number} timeLimit - 游戏时间限制（540 秒）
+ * @property {Array} cards - 桌面所有卡牌
+ * @property {Array} hand - 玩家手牌
+ * @property {boolean} gameActive - 游戏是否进行中
+ */
 // Version: 2026-03-08
 
 class PvZMatchGame {
+    /**
+     * 创建游戏实例并初始化所有状态
+     * @constructor
+     */
     constructor() {
-        this.handSize = 7;
-        this.baseCardTypes = 12;
-        this.faceDownRatio = 0.15;
-        this.exposeRatio = 0.40;
-        this.timeLimit = 9 * 60;
-        this.currentTime = this.timeLimit;
-        this.timer = null;
+        // 游戏配置
+        this.handSize = 7;                    // 手牌区最大容量
+        this.baseCardTypes = 12;              // 基础植物图案种类
+        this.faceDownRatio = 0.15;            // 背面朝上牌的比例
+        this.exposeRatio = 0.40;              // 顶层暴露比例
+        this.timeLimit = 9 * 60;              // 游戏时间限制（秒）
+        this.currentTime = this.timeLimit;    // 剩余时间
+        this.timer = null;                    // 计时器引用
         
+        // 植物和僵尸 emoji 图案库
         this.pvzEmojis = {
             plants: ['🌻', '🌱', '🌽', '🍄', '🌵', '🌷', '🌹', '🍀', '🌿', '🥕', '🍅', '🥬'],
             zombies: ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7', 'Z8', 'Z9', 'Z10', 'Z11', 'Z12']
         };
         
-        this.level = 1;
-        this.score = 0;
-        this.moves = 0;
-        this.history = [];
-        this.cards = [];
-        this.hand = [];
-        this.gameActive = false;
-        this.isPaused = false;
+        // 游戏状态
+        this.level = 1;                       // 当前关卡
+        this.score = 0;                       // 玩家得分
+        this.moves = 0;                       // 移动次数
+        this.history = [];                    // 操作历史记录
+        this.cards = [];                      // 桌面所有卡牌数组
+        this.hand = [];                       // 玩家手牌数组
+        this.gameActive = false;              // 游戏是否进行中
+        this.isPaused = false;                // 是否暂停
         
+        // 关卡配置（10 个难度等级）
+        // layers: 最大层数，totalCards: 总牌数，cardTypes: 图案种类，spread: 分散度
         this.levelConfigs = [
-            { layers: 3, totalCards: 90, cardTypes: 12, spread: 0.9 },
-            { layers: 3, totalCards: 108, cardTypes: 12, spread: 0.85 },
-            { layers: 4, totalCards: 126, cardTypes: 14, spread: 0.8 },
-            { layers: 4, totalCards: 144, cardTypes: 16, spread: 0.75 },
-            { layers: 5, totalCards: 162, cardTypes: 18, spread: 0.7 },
-            { layers: 5, totalCards: 180, cardTypes: 20, spread: 0.65 },
-            { layers: 6, totalCards: 198, cardTypes: 22, spread: 0.6 },
-            { layers: 6, totalCards: 216, cardTypes: 24, spread: 0.55 },
-            { layers: 7, totalCards: 234, cardTypes: 24, spread: 0.5 },
-            { layers: 7, totalCards: 252, cardTypes: 24, spread: 0.45 },
+            { layers: 3, totalCards: 90, cardTypes: 12, spread: 0.9 },   // Level 1
+            { layers: 3, totalCards: 108, cardTypes: 12, spread: 0.85 }, // Level 2
+            { layers: 4, totalCards: 126, cardTypes: 14, spread: 0.8 },  // Level 3
+            { layers: 4, totalCards: 144, cardTypes: 16, spread: 0.75 }, // Level 4
+            { layers: 5, totalCards: 162, cardTypes: 18, spread: 0.7 },  // Level 5
+            { layers: 5, totalCards: 180, cardTypes: 20, spread: 0.65 }, // Level 6
+            { layers: 6, totalCards: 198, cardTypes: 22, spread: 0.6 },  // Level 7
+            { layers: 6, totalCards: 216, cardTypes: 24, spread: 0.55 }, // Level 8
+            { layers: 7, totalCards: 234, cardTypes: 24, spread: 0.5 },  // Level 9
+            { layers: 7, totalCards: 252, cardTypes: 24, spread: 0.45 }, // Level 10
         ];
         
+        // 初始化游戏
         this.initGame();
     }
     
+    /**
+     * 初始化游戏：绑定事件、开始新游戏、启动计时器
+     * @method initGame
+     */
     initGame() {
-        this.bindEvents();
-        this.newGame();
-        this.startTimer();
+        this.bindEvents();    // 绑定 UI 事件监听器
+        this.newGame();       // 初始化新游戏状态
+        this.startTimer();    // 启动倒计时
     }
     
+    /**
+     * 获取当前关卡的配置参数
+     * @method getLevelConfig
+     * @returns {Object} 关卡配置对象 {layers, totalCards, cardTypes, spread}
+     */
     getLevelConfig() {
+        // 返回当前关卡配置，如果超过最大关卡则返回最后一个配置
         return this.levelConfigs[Math.min(this.level - 1, this.levelConfigs.length - 1)];
     }
     
+    /**
+     * 创建卡牌数据数组
+     * 根据关卡配置生成指定数量的卡牌，确保每种图案数量是 3 的倍数（可消除）
+     * @method createCards
+     * @returns {Array} 卡牌对象数组
+     * 
+     * @description
+     * 算法流程：
+     * 1. 计算每种图案的基础数量（至少 3 张，最多不超过剩余牌数）
+     * 2. 如果还有剩余，随机分配给某些图案（保持 3 的倍数）
+     * 3. 创建卡牌对象，包含位置、层级、旋转等属性
+     */
     createCards() {
         const config = this.getLevelConfig();
         const cards = [];
-        const cardsPerType = [];
+        const cardsPerType = [];  // 每种图案的卡牌数量
         let remaining = config.totalCards;
         
+        // 第一步：分配基础数量（每种至少 3 张）
         for (let i = 0; i < config.cardTypes; i++) {
+            // 计算当前图案可以分配的数量（3 的倍数）
             const count = Math.min(Math.max(3, Math.floor(Math.random() * 3) * 3 + 3), remaining - (config.cardTypes - i - 1) * 3);
             cardsPerType.push(count);
             remaining -= count;
         }
         
+        // 第二步：如果还有剩余，继续随机分配（保持 3 的倍数）
         while (remaining > 0) {
             const idx = Math.floor(Math.random() * config.cardTypes);
             cardsPerType[idx] += 3;
             remaining -= 3;
         }
         
+        // 第三步：创建卡牌对象
         let id = 0;
         for (let i = 0; i < config.cardTypes; i++) {
             for (let j = 0; j < cardsPerType[i]; j++) {
-                cards.push({ id: id++, emoji: '', faceUp: true, removed: false, layer: 0, x: 0, y: 0, width: 60, height: 60, rotation: 0 });
+                cards.push({ 
+                    id: id++, 
+                    emoji: '',           // 植物图案（后续分配）
+                    faceUp: true,        // 是否正面朝上
+                    removed: false,      // 是否已消除
+                    layer: 0,            // 层级（0 为最底层）
+                    x: 0, y: 0,          // 坐标位置
+                    width: 60, height: 60, // 卡牌尺寸
+                    rotation: 0          // 旋转角度（±15°）
+                });
             }
         }
         return cards;
